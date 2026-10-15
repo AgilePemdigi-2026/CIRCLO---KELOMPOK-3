@@ -1,25 +1,47 @@
-# Upload Material CIRCLO (React/Next.js + Gemini)
+# CIRCLO | Frontend Upload Material (AI)
 
-Halaman Upload Material (Gambar 1.7) dan AI Classification Result (Gambar 1.8) pada SRS CIRCLO.
+Bagian Aditya, Sprint 1 nomor 4: **Upload Material (Seller)**, yaitu form detail material dan hasil klasifikasi AI.
+Stack mengikuti SRS: Next.js, JavaScript, Tailwind CSS.
 
-## Isi
+## Menjalankan
 
-- `app/upload-material/page.jsx`: halaman (form, hasil klasifikasi, navbar, footer)
-- `app/api/classify-material/route.js`: pemanggil Gemini di sisi server
-- `public/images/`: logo dan foto gudang yang dipotong dari rancangan di laporan
-- `.env.local.example`: contoh konfigurasi
+```bash
+npm install
+cp .env.example .env.local   # isi GEMINI_API_KEY dari Google AI Studio
+npm run dev
+```
 
-## Pemasangan
+Buka http://localhost:3000 (otomatis ke /upload-material).
 
-1. Salin folder `app/` dan `public/images/` ke proyek Next.js (App Router, Tailwind CSS).
-2. Pasang ikon: `npm i lucide-react`
-3. Salin `.env.local.example` menjadi `.env.local`, isi `GEMINI_API_KEY` dari Google AI Studio.
-4. Jalankan `npm run dev`, buka `/upload-material`.
+Tanpa API key, klasifikasi tetap jalan dalam mode demo (aturan kata kunci sederhana) dan halaman hasil menampilkan catatannya.
 
-Jika navbar dan footer sudah ada di `layout.jsx`, hapus komponen `Navbar` dan `Footer` di `page.jsx`.
+## Gemini
 
-## Yang masih perlu disambungkan
+- Default: `gemini-3.8-flash`, model terbaru yang punya tier gratis (API key dari Google AI Studio, tanpa kartu kredit).
+- Cadangan: `gemini-3.5-flash-lite` (`GEMINI_FALLBACK_MODEL`). Kalau model utama kena batas kuota (HTTP 429) atau ditolak, otomatis pindah ke sini, lalu ke mode demo.
+- Tier gratis punya batas permintaan yang tidak dijamin Google dan angkanya terlihat di AI Studio. Konten di tier gratis juga bisa dipakai Google untuk meningkatkan produknya, jadi jangan kirim data sensitif.
+- Punya akun berbayar? Isi `GEMINI_MODEL=gemini-4-argon` untuk Gemini terbaru (tidak tersedia di tier gratis).
+- `GEMINI_THINKING_LEVEL` bawaan `low` (low, medium, high). Parameter `temperature`, `top_p`, `top_k` tidak dikirim karena sudah deprecated di model terbaru.
+- Nama model sering diganti Google. Cek daftar terbaru di https://ai.google.dev/gemini-api/docs/changelog
 
-- `saveMaterial()` di `page.jsx`: isi dengan insert ke Supabase (dan unggah foto ke Supabase Storage).
-- `route.js`: tambahkan pengecekan sesi dan role Seller (ada penanda TODO).
-- Nama model Gemini bisa diganti lewat `GEMINI_MODEL`.
+## Struktur
+
+- `app/upload-material/page.js` : form upload (Gambar 1.7 SRS)
+- `app/upload-material/result/page.js` : hasil klasifikasi + Edit / Confirm (Gambar 1.8 SRS)
+- `app/api/classify/route.js` : panggil Gemini (teks + foto), output JSON terstruktur
+- `lib/materials.js` : tempat menyambung insert ke Supabase setelah Confirm (masih stub)
+- `components/Navbar.js`, `components/Footer.js` : komponen bersama, bisa dipakai halaman teman
+
+## Alur sesuai user story SRS 4.6
+
+Submit data lengkap -> hasil klasifikasi -> Confirm -> "Material uploaded successfully" -> /marketplace.
+Data tidak lengkap -> "Upload failed. Please check the data".
+
+## Role (Buyer, Seller, Pemerintah)
+
+- Menu navbar berubah sesuai role (`lib/roles.js`, diambil dari mockup SRS).
+- Halaman Upload Material dan hasil klasifikasi hanya untuk Seller. Buyer dan Pemerintah melihat pesan "Halaman ini khusus Seller".
+- Role dibaca dari sesi login Supabase (`app_metadata.role` atau `user_metadata.role`: buyer / seller / government). Samakan dengan teman yang mengurus Login/Register. Kalau role disimpan di tabel lain, ubah `roleFromUser()` di `lib/roles.js`.
+- Tanpa login di production, pengguna dialihkan ke `/login` (ubah lewat `NEXT_PUBLIC_LOGIN_PATH`).
+- Uji tampilan tanpa login (hanya `npm run dev`): tambahkan `?role=buyer`, `?role=seller`, atau `?role=government` ke URL, `?role=reset` untuk menghapusnya. Tanpa pilihan itu, mode dev dianggap Seller.
+- Pembatasan di sisi browser hanya soal tampilan. Keamanan sebenarnya ada di aturan RLS Supabase (lihat `supabase/materials.sql`).
