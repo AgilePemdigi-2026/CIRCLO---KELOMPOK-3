@@ -119,9 +119,6 @@ function ClassificationResult() {
           <div className="relative min-h-[360px]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={photo?.dataUrl} alt={result.nama} className="absolute inset-0 h-full w-full object-cover" />
-            <span className="absolute bottom-4 left-4 rounded-full bg-white/95 px-4 py-1.5 text-[13px] font-semibold shadow">
-              Gambar: {photo?.name}
-            </span>
           </div>
 
           <div className="flex flex-col px-8 pb-8 pt-10">
