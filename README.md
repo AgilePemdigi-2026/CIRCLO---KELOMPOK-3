@@ -1,47 +1,59 @@
-# CIRCLO | Frontend Upload Material (AI)
+# Upload Material CIRCLO
 
-Bagian Aditya, Sprint 1 nomor 4: **Upload Material (Seller)**, yaitu form detail material dan hasil klasifikasi AI.
-Stack mengikuti SRS: Next.js, JavaScript, Tailwind CSS.
+Halaman Upload Material (Gambar 1.7) dan AI Classification Result (Gambar 1.8) pada SRS CIRCLO,
+dengan komponen AI sesuai SRS 3.3.3 (Python, Pandas, NumPy, Scikit-learn, Random Forest Regressor, XGBoost)
+ditambah integrasi LLM Gemini.
 
-## Menjalankan
+## Arsitektur
 
-```bash
-npm install
-cp .env.example .env.local   # isi GEMINI_API_KEY dari Google AI Studio
-npm run dev
-```
+Browser -> Next.js (Vercel) -> `/api/classify-material` -> CIRCLO AI Service (Python/FastAPI, Render)
 
-Buka http://localhost:3000 (otomatis ke /upload-material).
+AI Service menjalankan dua hal berurutan:
 
-Tanpa API key, klasifikasi tetap jalan dalam mode demo (aturan kata kunci sederhana) dan halaman hasil menampilkan catatannya.
+1. Klasifikasi material oleh Gemini (deskripsi + foto) menjadi jenis, kategori, kondisi, dimensi, dan skor kelayakan.
+2. Estimasi harga per unit oleh Random Forest Regressor dan XGBoost (rata-rata keduanya), memakai hasil klasifikasi dan jumlah material.
 
-## Gemini
+API key Gemini hanya ada di AI Service. Next.js dan AI Service berbagi kunci `AI_SERVICE_KEY`.
 
-- Default: `gemini-3.8-flash`, model terbaru yang punya tier gratis (API key dari Google AI Studio, tanpa kartu kredit).
-- Cadangan: `gemini-3.5-flash-lite` (`GEMINI_FALLBACK_MODEL`). Kalau model utama kena batas kuota (HTTP 429) atau ditolak, otomatis pindah ke sini, lalu ke mode demo.
-- Tier gratis punya batas permintaan yang tidak dijamin Google dan angkanya terlihat di AI Studio. Konten di tier gratis juga bisa dipakai Google untuk meningkatkan produknya, jadi jangan kirim data sensitif.
-- Punya akun berbayar? Isi `GEMINI_MODEL=gemini-4-argon` untuk Gemini terbaru (tidak tersedia di tier gratis).
-- `GEMINI_THINKING_LEVEL` bawaan `low` (low, medium, high). Parameter `temperature`, `top_p`, `top_k` tidak dikirim karena sudah deprecated di model terbaru.
-- Nama model sering diganti Google. Cek daftar terbaru di https://ai.google.dev/gemini-api/docs/changelog
+## Isi
 
-## Struktur
+- `app/upload-material/page.jsx`: halaman (form, hasil klasifikasi, navbar, footer)
+- `app/api/classify-material/route.js`: penghubung Next.js ke AI Service
+- `ai-service/main.py`: FastAPI, pemanggil Gemini, endpoint `/analyze` dan `/health`
+- `ai-service/price_model.py`: model Random Forest dan XGBoost (Pandas, NumPy, Scikit-learn)
+- `ai-service/train_price_model.py`: pelatihan model dari `data/materials.csv`
+- `ai-service/render.yaml`: konfigurasi deploy ke Render
+- `public/images/`: logo dan foto gudang yang dipotong dari rancangan di laporan
 
-- `app/upload-material/page.js` : form upload (Gambar 1.7 SRS)
-- `app/upload-material/result/page.js` : hasil klasifikasi + Edit / Confirm (Gambar 1.8 SRS)
-- `app/api/classify/route.js` : panggil Gemini (teks + foto), output JSON terstruktur
-- `lib/materials.js` : tempat menyambung insert ke Supabase setelah Confirm (masih stub)
-- `components/Navbar.js`, `components/Footer.js` : komponen bersama, bisa dipakai halaman teman
+## Menjalankan di komputer
 
-## Alur sesuai user story SRS 4.6
+Terminal 1 (AI Service):
 
-Submit data lengkap -> hasil klasifikasi -> Confirm -> "Material uploaded successfully" -> /marketplace.
-Data tidak lengkap -> "Upload failed. Please check the data".
+    cd ai-service
+    pip install -r requirements.txt
+    cp .env.example .env        # isi GEMINI_API_KEY dan AI_SERVICE_KEY
+    python train_price_model.py
+    uvicorn main:app --port 8000
 
-## Role (Buyer, Seller, Pemerintah)
+Terminal 2 (Next.js, di proyek Anda):
 
-- Menu navbar berubah sesuai role (`lib/roles.js`, diambil dari mockup SRS).
-- Halaman Upload Material dan hasil klasifikasi hanya untuk Seller. Buyer dan Pemerintah melihat pesan "Halaman ini khusus Seller".
-- Role dibaca dari sesi login Supabase (`app_metadata.role` atau `user_metadata.role`: buyer / seller / government). Samakan dengan teman yang mengurus Login/Register. Kalau role disimpan di tabel lain, ubah `roleFromUser()` di `lib/roles.js`.
-- Tanpa login di production, pengguna dialihkan ke `/login` (ubah lewat `NEXT_PUBLIC_LOGIN_PATH`).
-- Uji tampilan tanpa login (hanya `npm run dev`): tambahkan `?role=buyer`, `?role=seller`, atau `?role=government` ke URL, `?role=reset` untuk menghapusnya. Tanpa pilihan itu, mode dev dianggap Seller.
-- Pembatasan di sisi browser hanya soal tampilan. Keamanan sebenarnya ada di aturan RLS Supabase (lihat `supabase/materials.sql`).
+    npm i lucide-react
+    cp .env.local.example .env.local    # AI_SERVICE_KEY harus sama dengan di ai-service/.env
+    npm run dev
+
+Salin folder `app/` dan `public/images/` ke proyek Next.js (App Router, Tailwind CSS), lalu buka `/upload-material`.
+Jika navbar dan footer sudah ada di `layout.jsx`, hapus komponen `Navbar` dan `Footer` di `page.jsx`.
+
+## Deploy
+
+- Render: buat Blueprint dari `ai-service/render.yaml`, isi `GEMINI_API_KEY` dan `AI_SERVICE_KEY`.
+- Vercel: isi `AI_SERVICE_URL` (URL dari Render) dan `AI_SERVICE_KEY`.
+
+## Catatan
+
+- Data latih harga yang dibuat otomatis hanya data contoh sintetis agar pipeline bisa dicoba, bukan harga pasar.
+  Ganti `ai-service/data/materials.csv` dengan data asli (kolom: jenis_material, kategori, kondisi, quantity, harga_per_unit), lalu latih ulang.
+- Hasil estimasi harga dikirim di field `estimasi_harga` pada respons, tetapi belum ditampilkan di UI agar tampilan tetap sama dengan laporan.
+- Mode Edit (SRS 3.1.7): buka `/upload-material?id=<id material>`. Tombol Edit di My Materials cukup mengarah ke URL itu.
+- `saveMaterial()`, `fetchMaterial()`, dan `updateMaterial()` di `page.jsx` masih kosong, sambungkan ke Supabase. Pengecekan role Seller di `route.js` masih TODO.
+- Nama model Gemini bisa diganti lewat `GEMINI_MODEL`.
