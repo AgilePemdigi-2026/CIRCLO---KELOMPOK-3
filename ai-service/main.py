@@ -19,6 +19,7 @@ from typing import Optional
 import httpx
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from price_model import PriceEstimator
@@ -68,6 +69,16 @@ RESPONSE_SCHEMA = {
 }
 
 app = FastAPI(title="CIRCLO AI Service")
+
+# TAMBAHKAN INI AGAR BROWSER LOCALHOST:3000 BISA MENGAKSES
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 estimator = PriceEstimator()
 
 
@@ -80,8 +91,9 @@ class MaterialIn(BaseModel):
 
 
 def require_key(x_api_key: str | None = Header(default=None)) -> None:
+    # Jika AI_SERVICE_KEY kosong di .env.local, lewati pemeriksaan key agar tidak 500 saat dev lokal
     if not SERVICE_KEY:
-        raise HTTPException(500, "AI_SERVICE_KEY belum diatur di server AI.")
+        return
     if not x_api_key or not hmac.compare_digest(x_api_key, SERVICE_KEY):
         raise HTTPException(401, "Tidak diizinkan.")
 
@@ -153,6 +165,11 @@ def to_number(value: str) -> float:
         return float(value)
     except (TypeError, ValueError):
         return 0.0
+
+
+@app.get("/")
+def root():
+    return {"status": "ok", "service": "CIRCLO AI Service"}
 
 
 @app.get("/health")
