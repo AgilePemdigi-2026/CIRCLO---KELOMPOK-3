@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
+import Navbar from "@/components/Navbar";
 
 const AI_GREETING =
   "Halo! Aku **CIRCLO AI**, asisten usaha dari material daur ulang. Ceritakan kebutuhan materialmu (misalnya produk yang ingin dibuat), lalu sebutkan **kota** dan perkiraan **modal** agar rekomendasinya pas.";
@@ -169,7 +170,9 @@ export default function CariMaterialPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
+    <>
+      <Navbar />
+      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
 
       {/* Banner Notifikasi */}
       {showBanner && (
@@ -323,5 +326,6 @@ export default function CariMaterialPage() {
 
       </div>
     </div>
+    </>
   );
 }

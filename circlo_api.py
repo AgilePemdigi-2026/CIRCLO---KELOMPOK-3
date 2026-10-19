@@ -37,7 +37,8 @@ from circlo_ai.catalog import SupabaseCatalog, region_candidates
 from circlo_ai.dialog import DialogManager, State
 from circlo_ai.embedder import E5Embedder
 from circlo_ai.recommender import Recommender
-
+from dotenv import load_dotenv
+load_dotenv(".env.local")
 MAX_TEXT_LEN = 2000
 HISTORY_LEN = 10
 CARD_FIELDS = ("id_material", "id_seller", "nama_material", "kategori", "harga", "satuan",

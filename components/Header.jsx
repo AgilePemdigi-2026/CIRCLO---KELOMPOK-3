@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import logoCirclo from "../../assets/LOGO CIRCLO.png";
+import logoCirclo from "../assets/LOGO CIRCLO.png";
 
 export default function Header() {
   const pathname = usePathname();

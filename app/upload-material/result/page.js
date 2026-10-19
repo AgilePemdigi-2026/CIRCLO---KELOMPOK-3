@@ -45,16 +45,12 @@ function ClassificationResult() {
     try {
       const res = await saveMaterial({
         nama: r.nama,
-        jenis_material: r.jenisMaterial,
-        kategori: r.kategori,
-        kondisi: r.kondisi,
-        dimensi: r.dimensi,
-        skor: r.skor,
+        kategori: r.jenisMaterial,
+        satuan: data.form.satuan,
         deskripsi: data.form.description,
         jumlah: Number(data.form.quantity),
         harga: Number(data.form.price),
         lokasi: data.form.location,
-        foto: data.photo?.dataUrl,
       });
       setPersisted(res.persisted);
       clearDraft();
