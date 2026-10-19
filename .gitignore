@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+
+# Build output
+.next/
+out/
+
+# Environment / secrets (jangan pernah di-commit)
+.env
+.env.local
+.env*.local
+
+# OS / editor
+.DS_Store
+Thumbs.db
