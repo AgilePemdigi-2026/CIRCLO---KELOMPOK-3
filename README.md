@@ -1,59 +1,173 @@
-# Upload Material CIRCLO
+# ♻️ CIRCLO
+### AI-Powered Recycled Material Marketplace
 
-Halaman Upload Material (Gambar 1.7) dan AI Classification Result (Gambar 1.8) pada SRS CIRCLO,
-dengan komponen AI sesuai SRS 3.3.3 (Python, Pandas, NumPy, Scikit-learn, Random Forest Regressor, XGBoost)
-ditambah integrasi LLM Gemini.
+**Menghubungkan kebutuhan material daur ulang dengan solusi yang lebih cerdas.**
 
-## Arsitektur
+CIRCLO adalah platform berbasis web yang dirancang untuk membantu pengguna menemukan, mengenali, dan mengelola kebutuhan material daur ulang secara lebih mudah. Dengan menggabungkan marketplace dan kecerdasan buatan, CIRCLO bertujuan mendukung pemanfaatan kembali material serta membuka peluang ekonomi sirkular.
 
-Browser -> Next.js (Vercel) -> `/api/classify-material` -> CIRCLO AI Service (Python/FastAPI, Render)
+🌱 *Turn Waste Into Worth.*
 
-AI Service menjalankan dua hal berurutan:
+---
 
-1. Klasifikasi material oleh Gemini (deskripsi + foto) menjadi jenis, kategori, kondisi, dimensi, dan skor kelayakan.
-2. Estimasi harga per unit oleh Random Forest Regressor dan XGBoost (rata-rata keduanya), memakai hasil klasifikasi dan jumlah material.
+## 🌍 About CIRCLO
 
-API key Gemini hanya ada di AI Service. Next.js dan AI Service berbagi kunci `AI_SERVICE_KEY`.
+Material yang dianggap tidak terpakai masih memiliki potensi untuk diolah menjadi produk bernilai. Namun, menemukan material yang sesuai, memahami karakteristiknya, dan menghubungkan pihak yang membutuhkan dengan penyedia material dapat menjadi tantangan tersendiri.
 
-## Isi
+**CIRCLO hadir untuk menjembatani kebutuhan tersebut** melalui platform digital yang mengintegrasikan pencarian material, katalog, klasifikasi material, dan asisten AI.
 
-- `app/upload-material/page.jsx`: halaman (form, hasil klasifikasi, navbar, footer)
-- `app/api/classify-material/route.js`: penghubung Next.js ke AI Service
-- `ai-service/main.py`: FastAPI, pemanggil Gemini, endpoint `/analyze` dan `/health`
-- `ai-service/price_model.py`: model Random Forest dan XGBoost (Pandas, NumPy, Scikit-learn)
-- `ai-service/train_price_model.py`: pelatihan model dari `data/materials.csv`
-- `ai-service/render.yaml`: konfigurasi deploy ke Render
-- `public/images/`: logo dan foto gudang yang dipotong dari rancangan di laporan
+## ✨ Key Features
 
-## Menjalankan di komputer
+| Feature | Description |
+|---|---|
+| 🔎 **Cari Material dengan AI** | Membantu pengguna menemukan material daur ulang berdasarkan kebutuhan melalui interaksi dengan asisten AI. |
+| 🛍️ **Marketplace Material** | Menyediakan pengalaman menjelajahi material dan kebutuhan terkait dalam satu platform. |
+| 📦 **Katalog Material** | Menampilkan informasi material melalui halaman katalog dan detail material. |
+| 🧠 **AI Material Assistant** | Mendukung pencarian dan pemberian rekomendasi material berdasarkan informasi yang tersedia. |
+| 🧪 **Klasifikasi Material** | Menyediakan alur klasifikasi material melalui layanan backend. |
+| 🔐 **Autentikasi Pengguna** | Menyediakan halaman login dan registrasi untuk mendukung akses pengguna. |
+| 📤 **Upload Material** | Menyediakan alur pengunggahan material untuk diproses lebih lanjut. |
 
-Terminal 1 (AI Service):
+## 🛠️ Tech Stack
 
-    cd ai-service
-    pip install -r requirements.txt
-    cp .env.example .env        # isi GEMINI_API_KEY dan AI_SERVICE_KEY
-    python train_price_model.py
-    uvicorn main:app --port 8000
+**Frontend**
+- Next.js
+- React
+- Tailwind CSS
+- Lucide React
 
-Terminal 2 (Next.js, di proyek Anda):
+**Backend & AI**
+- Python
+- API berbasis Python
+- Pemrosesan dan rekomendasi material
+- Integrasi layanan AI
 
-    npm i lucide-react
-    cp .env.local.example .env.local    # AI_SERVICE_KEY harus sama dengan di ai-service/.env
-    npm run dev
+**Database & Authentication**
+- Supabase
 
-Salin folder `app/` dan `public/images/` ke proyek Next.js (App Router, Tailwind CSS), lalu buka `/upload-material`.
-Jika navbar dan footer sudah ada di `layout.jsx`, hapus komponen `Navbar` dan `Footer` di `page.jsx`.
+## 🏗️ Project Architecture
 
-## Deploy
+CIRCLO menggunakan arsitektur yang memisahkan antarmuka pengguna, API aplikasi, dan pemrosesan AI.
 
-- Render: buat Blueprint dari `ai-service/render.yaml`, isi `GEMINI_API_KEY` dan `AI_SERVICE_KEY`.
-- Vercel: isi `AI_SERVICE_URL` (URL dari Render) dan `AI_SERVICE_KEY`.
+```text
+CIRCLO
+├── app/                 # Halaman dan API Next.js
+│   ├── api/             # API routes
+│   ├── buyer/           # Halaman buyer
+│   ├── cari-material/   # Pencarian material dengan AI
+│   ├── katalog/         # Katalog dan detail material
+│   ├── login/            # Autentikasi
+│   ├── register/         # Registrasi
+│   └── upload-material/ # Unggah material
+├── components/          # Komponen antarmuka
+├── lib/                 # Helper dan integrasi layanan
+├── circlo_ai/           # Modul AI dan rekomendasi
+├── dataset/             # Dataset dan data pendukung AI
+├── circlo_api.py        # Backend API Python
+├── circlo_llm.py        # Integrasi LLM
+├── requirements.txt     # Dependensi Python
+├── package.json         # Dependensi frontend
+└── README.md
+```
 
-## Catatan
+*Struktur di atas merupakan gambaran komponen utama proyek. Detail direktori dapat berubah mengikuti pengembangan.*
 
-- Data latih harga yang dibuat otomatis hanya data contoh sintetis agar pipeline bisa dicoba, bukan harga pasar.
-  Ganti `ai-service/data/materials.csv` dengan data asli (kolom: jenis_material, kategori, kondisi, quantity, harga_per_unit), lalu latih ulang.
-- Hasil estimasi harga dikirim di field `estimasi_harga` pada respons, tetapi belum ditampilkan di UI agar tampilan tetap sama dengan laporan.
-- Mode Edit (SRS 3.1.7): buka `/upload-material?id=<id material>`. Tombol Edit di My Materials cukup mengarah ke URL itu.
-- `saveMaterial()`, `fetchMaterial()`, dan `updateMaterial()` di `page.jsx` masih kosong, sambungkan ke Supabase. Pengecekan role Seller di `route.js` masih TODO.
-- Nama model Gemini bisa diganti lewat `GEMINI_MODEL`.
+## 🚀 Getting Started
+
+Ikuti langkah berikut untuk menjalankan CIRCLO secara lokal.
+
+### Prerequisites
+
+Pastikan perangkat telah memiliki:
+- Node.js dan npm
+- Python
+- Git
+- Akun dan konfigurasi Supabase jika ingin menggunakan fitur yang memerlukannya
+
+### 1. Clone Repository
+
+```bash
+git clone https://github.com/AgilePemdigi-2026/CIRCLO---KELOMPOK-3.git
+cd CIRCLO---KELOMPOK-3
+```
+
+### 2. Install Frontend Dependencies
+
+```bash
+npm install
+```
+
+### 3. Configure Environment Variables
+
+Buat file `.env.local` di root proyek. Sesuaikan variabel dengan layanan yang digunakan.
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your_supabase_publishable_key
+
+CIRCLO_AI_URL=http://127.0.0.1:8000
+```
+
+Tambahkan kredensial AI di konfigurasi backend sesuai kebutuhan. Gunakan secret milikmu sendiri dan jangan pernah memasukkan API key asli ke repository.
+
+### 4. Install Python Dependencies
+
+```bash
+python -m venv .venv
+```
+
+Aktifkan virtual environment di Windows:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+Kemudian install dependensi:
+
+```bash
+pip install -r requirements.txt
+```
+
+### 5. Run the Application
+
+Jalankan backend Python menggunakan entry point yang tersedia di proyek:
+
+```bash
+python circlo_api.py
+```
+
+Pastikan backend berjalan pada alamat yang dikonfigurasi di `CIRCLO_AI_URL`.
+
+Buka terminal kedua, lalu jalankan frontend:
+
+```bash
+npm run dev
+```
+
+Buka [http://localhost:3000](http://localhost:3000) di browser.
+
+> Jika backend menggunakan perintah startup atau port yang berbeda, sesuaikan dengan konfigurasi aktual di `circlo_api.py`.
+
+## 👥 Team CIRCLO
+
+Developed collaboratively by the CIRCLO project team.
+
+- **Adit**: Pengembangan fitur dan integrasi aplikasi.
+- **Allya**: Pengembangan antarmuka dan autentikasi.
+- **Rani**: Pengembangan fitur login dan autentikasi.
+- **Maysha**: Pengembangan fitur AI, pencarian material, dan rekomendasi.
+
+*Kontribusi di atas merangkum area pengerjaan berdasarkan integrasi branch; silakan sesuaikan dengan pembagian tugas resmi tim.*
+
+## 🌱 Our Vision
+
+Kami percaya bahwa material yang tidak lagi digunakan bukan berarti kehilangan nilainya.
+
+Melalui CIRCLO, kami ingin membantu menciptakan ekosistem yang menghubungkan material, manusia, dan teknologi untuk mendukung pemanfaatan sumber daya secara lebih berkelanjutan.
+
+**CIRCLO: Discover. Reuse. Create Value.** ♻️
+
+---
+
+<p align="center">
+  Made with 💚 by Team CIRCLO
+</p>
