@@ -1,0 +1,6 @@
+sentence-transformers
+supabase
+numpy
+fastapi
+uvicorn[standard]
+httpx
