@@ -4,6 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { CircleUserRound } from 'lucide-react';
+import FlashBanner from '@/components/FlashBanner';
 import { useRole } from '@/lib/auth';
 import { NAV_BY_ROLE } from '@/lib/roles';
 
@@ -13,6 +14,8 @@ export default function Navbar() {
   const nav = NAV_BY_ROLE[role] || { links: [], profileLabel: 'Profil' };
 
   return (
+    <>
+    <FlashBanner />
     <header className="border-b border-circlo-line/60 bg-circlo-bg">
       <div className="flex h-20 w-full items-center justify-between px-10">
         <div className="flex h-full items-center gap-[41px]">
@@ -46,5 +49,6 @@ export default function Navbar() {
         </Link>
       </div>
     </header>
+    </>
   );
 }

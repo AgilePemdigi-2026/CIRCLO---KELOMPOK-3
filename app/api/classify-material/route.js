@@ -4,12 +4,40 @@
 // alamat service tidak pernah dikirim ke browser.
 
 import { NextResponse } from "next/server";
+import { roleFromUser } from "@/lib/roles";
 
 export const runtime = "nodejs";
 export const maxDuration = 60; // Render paket gratis bisa lambat saat bangun dari tidur
 
+const deny = (status, error) => NextResponse.json({ error }, { status });
+
+// Hanya Seller yang login boleh memakai klasifikasi (SRS 5.3: hak akses berdasarkan role).
+// Saat npm run dev tanpa login, pemeriksaan dilewati agar halaman bisa dicoba. Di production wajib login.
+async function requireSeller(request) {
+  const isProd = process.env.NODE_ENV === "production";
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const token = (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+
+  if (!supabaseUrl || !supabaseKey) return isProd ? deny(503, "Autentikasi belum dikonfigurasi di server.") : null;
+  if (!token) return isProd ? deny(401, "Silakan login terlebih dahulu.") : null;
+
+  try {
+    const res = await fetch(`${supabaseUrl.replace(/\/$/, "")}/auth/v1/user`, {
+      headers: { apikey: supabaseKey, Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return deny(401, "Sesi login tidak valid. Silakan login ulang.");
+    if (roleFromUser(await res.json()) !== "seller") return deny(403, "Hanya Seller yang dapat mengunggah material.");
+  } catch {
+    return deny(503, "Autentikasi tidak dapat diperiksa. Coba lagi.");
+  }
+  return null;
+}
+
 export async function POST(request) {
-  // TODO: pastikan pengguna sudah login dan berperan Seller (Supabase auth).
+  const denied = await requireSeller(request);
+  if (denied) return denied;
 
   const baseUrl = process.env.AI_SERVICE_URL;
   const apiKey = process.env.AI_SERVICE_KEY;
@@ -47,6 +75,7 @@ export async function POST(request) {
         quantity: String(body.quantity || ""),
         price: String(body.price || ""),
         location: String(body.location || ""),
+        condition: String(body.condition || ""), // belum dipakai ai-service (diabaikan), disiapkan untuk nanti
         image: body.image || null,
       }),
       signal: AbortSignal.timeout(55000),
