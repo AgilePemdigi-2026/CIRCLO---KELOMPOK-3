@@ -8,7 +8,8 @@ create table if not exists public.materials (
   nama           text not null,
   jenis_material text not null,
   kategori       text not null,
-  kondisi        text not null,
+  kondisi        text not null,          -- penilaian AI (Sangat Baik, Baik, dst)
+  kondisi_seller text,                    -- isian Seller di field Condition, mis. 'Bersih dan kering'
   dimensi        text,
   skor_ai        integer check (skor_ai between 0 and 100),
   deskripsi      text not null,
