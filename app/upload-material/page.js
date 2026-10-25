@@ -1,24 +1,30 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import {
-  Archive, Banknote, Bot, CircleAlert, CircleCheck, LoaderCircle, MapPin, Sparkles,
+  Archive, Banknote, Bot, CircleAlert, CircleCheck, ClipboardCheck, LoaderCircle, MapPin, Sparkles, TriangleAlert,
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import RoleGate from '@/components/RoleGate';
+import { getAccessToken } from '@/lib/auth';
+import { setFlash } from '@/lib/flash';
 import { fileToResizedDataUrl } from '@/lib/image';
-import { loadDraft, saveDraft, saveResult } from '@/lib/storage';
+import { getMaterial, isDemoStore, updateMaterial } from '@/lib/materials';
+import { clearDraft, clearResult, loadDraft, loadResult, saveDraft, saveResult } from '@/lib/storage';
 
 const SAMPLE_PHOTO = '/images/kain-katun-hitam.jpg';
-const EMPTY_FORM = { description: '', quantity: '', price: '', location: '' };
+const EMPTY_FORM = { description: '', quantity: '', condition: '', price: '', location: '' };
+
+const isDataUrl = (v) => typeof v === 'string' && v.startsWith('data:');
 
 function validate(form, photo) {
   const errors = {};
-  if (form.description.trim().length < 3) errors.description = 'Deskripsi wajib diisi';
+  if (form.description.trim().length < 5) errors.description = 'Deskripsi wajib diisi (minimal 5 karakter)';
   if (!(Number(form.quantity) > 0)) errors.quantity = 'Jumlah wajib diisi';
+  if (!form.condition.trim()) errors.condition = 'Kondisi wajib diisi';
   if (form.price === '' || Number(form.price) < 0) errors.price = 'Harga wajib diisi';
   if (!form.location.trim()) errors.location = 'Lokasi wajib diisi';
   if (!photo) errors.photo = 'Foto wajib diunggah';
@@ -30,25 +36,62 @@ const fieldClass = (hasError) =>
     hasError ? 'border-red-500' : 'border-circlo-fieldline'
   }`;
 
+const NOTICE_STYLE = {
+  error: 'border-red-200 bg-red-50 text-red-700',
+  warning: 'border-amber-200 bg-amber-50 text-amber-900',
+  success: 'border-circlo-lime/60 bg-circlo-soft text-circlo-green',
+};
+
 function UploadMaterialForm() {
   const router = useRouter();
+  const editId = useSearchParams().get('id'); // ada id = mode Edit material (dari tombol Edit di My Materials)
+  const isEdit = Boolean(editId);
   const fileRef = useRef(null);
 
   const [form, setForm] = useState(EMPTY_FORM);
-  const [photo, setPhoto] = useState(null); // { dataUrl, name, sizeKb }
+  const [photo, setPhoto] = useState(null); // { dataUrl, name, sizeKb, remote? }
   const [errors, setErrors] = useState({});
-  const [formError, setFormError] = useState('');
+  const [notice, setNotice] = useState(null); // { type: 'error' | 'warning' | 'success', text }
   const [loading, setLoading] = useState(false);
-  const [notice, setNotice] = useState('');
+  const [saving, setSaving] = useState(false);
 
-  // Isi ulang form kalau Seller kembali dari halaman hasil (tombol Edit) atau punya draf
+  // Isi form: (1) kembali dari halaman hasil lewat tombol Edit, (2) mode edit material, (3) draf tersimpan
   useEffect(() => {
-    const draft = loadDraft();
-    if (draft) {
-      setForm({ ...EMPTY_FORM, ...draft.form });
-      if (draft.photo) setPhoto(draft.photo);
-    }
-  }, []);
+    let active = true;
+    (async () => {
+      const pending = loadResult();
+      if (pending && String(pending.editId || '') === String(editId || '')) {
+        setForm({ ...EMPTY_FORM, ...pending.form });
+        if (pending.photo) setPhoto(pending.photo);
+        return;
+      }
+      if (editId) {
+        try {
+          const m = await getMaterial(editId);
+          if (!active) return;
+          setForm({
+            description: m.deskripsi || '',
+            quantity: String(m.jumlah ?? ''),
+            condition: m.kondisi_seller || '',
+            price: String(m.harga ?? ''),
+            location: m.lokasi || '',
+          });
+          setPhoto(m.foto_url ? { dataUrl: m.foto_url, name: 'Foto material', remote: true } : null);
+        } catch {
+          if (active) setNotice({ type: 'error', text: 'Material tidak dapat dimuat.' });
+        }
+        return;
+      }
+      const draft = loadDraft();
+      if (draft) {
+        setForm({ ...EMPTY_FORM, ...draft.form });
+        if (draft.photo) setPhoto(draft.photo);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [editId]);
 
   const setField = (key) => (e) => {
     setForm((f) => ({ ...f, [key]: e.target.value }));
@@ -71,40 +114,91 @@ function UploadMaterialForm() {
     }
   }
 
-  function onSave() {
-    const ok = saveDraft({ form, photo });
-    setNotice(ok ? 'Draf tersimpan di browser ini.' : 'Draf tidak bisa disimpan (penyimpanan browser penuh).');
-    setTimeout(() => setNotice(''), 2500);
+  // Mode baru: simpan draf di browser. Mode edit: simpan perubahan material langsung (skenario "update material").
+  async function onSave() {
+    setNotice(null);
+    if (!isEdit) {
+      const ok = saveDraft({ form, photo });
+      setNotice(ok ? { type: 'success', text: 'Draf tersimpan di browser ini.' } : { type: 'error', text: 'Draf tidak bisa disimpan (penyimpanan browser penuh).' });
+      return;
+    }
+    const found = validate(form, photo);
+    setErrors(found);
+    if (Object.keys(found).length > 0) {
+      setNotice({ type: 'error', text: 'Upload failed. Please check the data' });
+      return;
+    }
+    setSaving(true);
+    try {
+      await updateMaterial(editId, {
+        deskripsi: form.description.trim(),
+        jumlah: Number(form.quantity),
+        kondisi_seller: form.condition.trim(),
+        harga: Number(form.price),
+        lokasi: form.location.trim(),
+        foto: photo.remote ? undefined : photo.dataUrl,
+      });
+      clearResult();
+      setFlash({
+        type: 'ok',
+        text: 'Material updated successfully',
+        note: isDemoStore ? 'Mode demo: tersimpan di browser ini saja, belum ke database.' : undefined,
+      });
+      router.push('/my-materials');
+    } catch (err) {
+      setNotice({ type: 'error', text: err.message || 'Perubahan gagal disimpan. Coba lagi.' });
+      setSaving(false);
+    }
   }
 
   async function onSubmit(e) {
     e.preventDefault();
+    setNotice(null);
     const found = validate(form, photo);
     setErrors(found);
     if (Object.keys(found).length > 0) {
-      setFormError('Upload failed. Please check the data');
+      setNotice({ type: 'error', text: 'Upload failed. Please check the data' });
       return;
     }
-    setFormError('');
     setLoading(true);
 
     try {
-      const res = await fetch('/api/classify', {
+      const token = await getAccessToken();
+      const res = await fetch('/api/classify-material', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, image: photo.dataUrl }),
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({
+          description: form.description,
+          quantity: form.quantity,
+          price: form.price,
+          location: form.location,
+          condition: form.condition,
+          image: isDataUrl(photo.dataUrl) ? photo.dataUrl : null, // foto lama (URL) tidak dikirim ulang ke AI
+        }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Klasifikasi gagal');
+      const data = await res.json().catch(() => ({}));
 
-      saveDraft({ form, photo });
-      saveResult({ form, photo, result: data });
+      if (!res.ok) {
+        setNotice({ type: 'error', text: data.error || 'Klasifikasi gagal. Coba lagi.' });
+        setLoading(false);
+        return;
+      }
+      if (!data.dapat_diklasifikasi) {
+        // REQ-104: minta Seller melengkapi deskripsi
+        setNotice({ type: 'warning', text: data.pesan || 'Deskripsi belum cukup jelas. Lengkapi jenis, kondisi, dan detail material.' });
+        setLoading(false);
+        return;
+      }
+      if (!isEdit) saveDraft({ form, photo });
+      saveResult({ form, photo, result: data, editId: editId || null });
       router.push('/upload-material/result');
-    } catch (err) {
-      setFormError(err.message || 'Terjadi kesalahan, coba lagi.');
+    } catch {
+      setNotice({ type: 'error', text: 'Koneksi bermasalah. Periksa jaringan Anda lalu coba lagi.' });
       setLoading(false);
     }
   }
+
+  const Alert = notice?.type === 'success' ? CircleCheck : notice?.type === 'warning' ? TriangleAlert : CircleAlert;
 
   return (
     <>
@@ -112,22 +206,23 @@ function UploadMaterialForm() {
         <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[2fr_1fr]">
           {/* Kartu form */}
           <form onSubmit={onSubmit} noValidate className="rounded-2xl bg-white p-8 shadow-card">
-            <h1 className="font-display text-[32px] font-semibold leading-tight text-circlo-ink">Upload Material</h1>
+            <h1 className="font-display text-[32px] font-semibold leading-tight text-circlo-ink">{isEdit ? 'Edit Material' : 'Upload Material'}</h1>
             <p className="mt-3 text-[16px] leading-[1.6] text-circlo-muted">
-              Bagikan sisa material Anda. Deskripsikan material, masukkan foto, dan lengkapi detailnya agar AI dapat
-              membantu klasifikasi material dengan lebih akurat.
+              {isEdit
+                ? 'Perbarui informasi material Anda. Tekan Save untuk menyimpan perubahan, atau Submit untuk meminta AI mengklasifikasi ulang.'
+                : 'Bagikan sisa material Anda. Deskripsikan material, masukkan foto, dan lengkapi detailnya agar AI dapat membantu klasifikasi material dengan lebih akurat.'}
             </p>
 
-            {formError && (
-              <div role="alert" className="mt-6 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-[14px] font-medium text-red-700">
-                <CircleAlert className="h-4 w-4 shrink-0" />
-                {formError}
+            {notice && (
+              <div role={notice.type === 'success' ? 'status' : 'alert'} className={`mt-6 flex items-start gap-2 rounded-lg border px-4 py-3 text-[14px] font-medium ${NOTICE_STYLE[notice.type]}`}>
+                <Alert className="mt-0.5 h-4 w-4 shrink-0" />
+                {notice.text}
               </div>
             )}
 
             {/* Foto */}
             <div className="mt-5">
-              <label className="text-[14px] font-medium">Photo</label>
+              <label htmlFor="photo" className="text-[14px] font-medium">Photo</label>
               <div className={`mt-3 rounded-xl border bg-white p-3 ${errors.photo ? 'border-red-500' : 'border-circlo-line'}`}>
                 <div className="relative h-[96px] w-full overflow-hidden rounded-lg">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -135,7 +230,7 @@ function UploadMaterialForm() {
                 </div>
                 <p className="mt-4 text-[14px] font-semibold">{photo ? photo.name : 'Foto material contoh'}</p>
                 <p className="mt-1 text-[14px] text-circlo-muted">
-                  {photo ? `${photo.sizeKb} KB — pratinjau material yang diunggah.` : 'Foto kain katun hitam — pratinjau material yang diunggah.'}
+                  {photo ? `${photo.sizeKb ? `${photo.sizeKb} KB — ` : ''}pratinjau material yang diunggah.` : 'Foto kain katun hitam — pratinjau material yang diunggah.'}
                 </p>
                 <button
                   type="button"
@@ -144,7 +239,7 @@ function UploadMaterialForm() {
                 >
                   Ganti Foto
                 </button>
-                <input ref={fileRef} type="file" name="photo" accept="image/*" onChange={onPickPhoto} className="hidden" />
+                <input ref={fileRef} type="file" id="photo" name="photo" accept="image/*" onChange={onPickPhoto} className="sr-only" tabIndex={-1} />
               </div>
               {errors.photo && <p className="mt-1.5 text-[13px] text-red-600">{errors.photo}</p>}
             </div>
@@ -188,6 +283,16 @@ function UploadMaterialForm() {
               </div>
             </div>
 
+            {/* Condition (ada di skenario SRS 4.6, tidak ada di mockup) */}
+            <div className="mt-6">
+              <label htmlFor="condition" className="block text-[14px] font-medium">Condition</label>
+              <div className="relative mt-2">
+                <ClipboardCheck className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-circlo-muted" />
+                <input id="condition" name="condition" type="text" value={form.condition} onChange={setField('condition')} placeholder="Bersih dan kering" className={`${fieldClass(errors.condition)} h-[46px] pl-11 pr-4`} />
+              </div>
+              {errors.condition && <p className="mt-1 text-[13px] text-red-600">{errors.condition}</p>}
+            </div>
+
             {/* Lokasi */}
             <div className="mt-6">
               <label htmlFor="location" className="block text-[14px] font-medium">Location</label>
@@ -199,10 +304,10 @@ function UploadMaterialForm() {
             </div>
 
             <div className="mt-8 flex items-center justify-between border-t border-circlo-line pt-6">
-              <button type="button" onClick={onSave} className="px-4 py-2 text-[14px] font-medium text-circlo-ink/80 hover:text-circlo-green">
+              <button type="button" onClick={onSave} disabled={saving} className="flex items-center gap-2 px-4 py-2 text-[14px] font-medium text-circlo-ink/80 hover:text-circlo-green disabled:opacity-60">
+                {saving && <LoaderCircle className="h-4 w-4 animate-spin" />}
                 Save
               </button>
-              {notice && <span className="text-[13px] text-circlo-green">{notice}</span>}
               <button
                 type="submit"
                 disabled={loading}
@@ -255,7 +360,10 @@ export default function UploadMaterialPage() {
     <>
       <Navbar />
       <RoleGate allow={['seller']}>
-        <UploadMaterialForm />
+        {/* useSearchParams membutuhkan Suspense pada App Router */}
+        <Suspense fallback={null}>
+          <UploadMaterialForm />
+        </Suspense>
       </RoleGate>
     </>
   );
