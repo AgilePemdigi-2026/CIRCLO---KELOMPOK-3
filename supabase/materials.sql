@@ -1,0 +1,24 @@
+-- supabase/materials.sql
+--
+-- CATATAN: tabel material sudah ada di database (dipakai bersama oleh CIRCLO AI),
+-- namanya `material` (TUNGGAL) dan sudah terisi data. JANGAN membuat tabel `materials`
+-- baru — itu tabel yang berbeda dan tidak dibaca AI.
+--
+-- Kolom tabel `material` saat ini:
+--   id_material        int (PK, auto)
+--   id_seller          int  -> penjual.id_seller
+--   nama_material      varchar
+--   kategori           varchar   (Kayu, Plastik, Kaca, Logam, Tekstil, Kertas, ...)
+--   stok               int
+--   status_material    boolean   (true = tampil di katalog)
+--   harga              numeric
+--   lokasi             text
+--   deskripsi_material text
+--   kota               varchar
+--   provinsi           varchar
+--   satuan             varchar   (kg / m2 / pcs)
+--   embedding          vector(768)  -> diisi oleh step2_embed_materials.py
+--
+-- Material hasil upload Seller disimpan lewat server route: app/api/materials/route.js
+-- (pakai SUPABASE_SERVICE_ROLE_KEY sehingga tidak terpengaruh RLS).
+-- Jadi file ini hanya dokumentasi; tidak ada DDL yang perlu dijalankan.
