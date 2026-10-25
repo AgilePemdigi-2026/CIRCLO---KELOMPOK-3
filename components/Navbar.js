@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { CircleUserRound } from 'lucide-react';
 import FlashBanner from '@/components/FlashBanner';
 import { useRole } from '@/lib/auth';
-import { NAV_BY_ROLE } from '@/lib/roles';
+import { NAV_BY_ROLE, dashboardPathFor } from '@/lib/roles';
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -19,7 +19,7 @@ export default function Navbar() {
     <header className="border-b border-circlo-line/60 bg-circlo-bg">
       <div className="flex h-20 w-full items-center justify-between px-10">
         <div className="flex h-full items-center gap-[41px]">
-          <Link href="/dashboard" className="flex items-center gap-3">
+          <Link href={dashboardPathFor(role)} className="flex items-center gap-3">
             <Image src="/images/circlo-logo.png" alt="CIRCLO" width={44} height={44} className="h-11 w-11 object-contain" />
             <span className="font-display text-[23.5px] font-extrabold tracking-tight text-circlo-green">CIRCLO</span>
           </Link>

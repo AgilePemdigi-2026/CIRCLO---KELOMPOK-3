@@ -65,6 +65,7 @@ function ClassificationResult() {
       kondisi_seller: form.condition.trim(),
       dimensi: n.dimensi,
       skor_ai: n.skor,
+      satuan: form.satuan,
       deskripsi: form.description.trim(),
       jumlah: Number(form.quantity),
       harga: Number(form.price),

@@ -16,7 +16,7 @@ import { getMaterial, isDemoStore, updateMaterial } from '@/lib/materials';
 import { clearDraft, clearResult, loadDraft, loadResult, saveDraft, saveResult } from '@/lib/storage';
 
 const SAMPLE_PHOTO = '/images/kain-katun-hitam.jpg';
-const EMPTY_FORM = { description: '', quantity: '', condition: '', price: '', location: '' };
+const EMPTY_FORM = { name: '', description: '', quantity: '', condition: '', price: '', location: '', satuan: '' };
 
 const isDataUrl = (v) => typeof v === 'string' && v.startsWith('data:');
 
@@ -26,6 +26,7 @@ function validate(form, photo) {
   if (!(Number(form.quantity) > 0)) errors.quantity = 'Jumlah wajib diisi';
   if (!form.condition.trim()) errors.condition = 'Kondisi wajib diisi';
   if (form.price === '' || Number(form.price) < 0) errors.price = 'Harga wajib diisi';
+  if (!['kg', 'm2', 'pcs'].includes(form.satuan)) errors.satuan = 'Satuan wajib dipilih';
   if (!form.location.trim()) errors.location = 'Lokasi wajib diisi';
   if (!photo) errors.photo = 'Foto wajib diunggah';
   return errors;
@@ -54,6 +55,8 @@ function UploadMaterialForm() {
   const [notice, setNotice] = useState(null); // { type: 'error' | 'warning' | 'success', text }
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState('');
 
   // Isi form: (1) kembali dari halaman hasil lewat tombol Edit, (2) mode edit material, (3) draf tersimpan
   useEffect(() => {
@@ -70,11 +73,14 @@ function UploadMaterialForm() {
           const m = await getMaterial(editId);
           if (!active) return;
           setForm({
+            ...EMPTY_FORM,
+            name: m.nama || '', // TODO: sesuaikan nama field dengan skema tabel materials
             description: m.deskripsi || '',
             quantity: String(m.jumlah ?? ''),
             condition: m.kondisi_seller || '',
             price: String(m.harga ?? ''),
             location: m.lokasi || '',
+            satuan: m.satuan || '', // TODO: sesuaikan nama field dengan skema tabel materials
           });
           setPhoto(m.foto_url ? { dataUrl: m.foto_url, name: 'Foto material', remote: true } : null);
         } catch {
@@ -148,6 +154,32 @@ function UploadMaterialForm() {
     } catch (err) {
       setNotice({ type: 'error', text: err.message || 'Perubahan gagal disimpan. Coba lagi.' });
       setSaving(false);
+    }
+  }
+
+  async function onGenerateDescription() {
+    const name = form.name.trim();
+    const description = form.description.trim();
+    if (!name && !description) {
+      setAiError('Isi dulu nama produk atau deskripsi singkat.');
+      return;
+    }
+    setAiError('');
+    setAiLoading(true);
+    try {
+      const res = await fetch('/api/generate-description', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, description }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Gagal membuat deskripsi.');
+      setForm((f) => ({ ...f, description: data.description }));
+      setErrors((er) => ({ ...er, description: undefined }));
+    } catch (err) {
+      setAiError(err.message || 'Terjadi kesalahan, coba lagi.');
+    } finally {
+      setAiLoading(false);
     }
   }
 
@@ -244,13 +276,42 @@ function UploadMaterialForm() {
               {errors.photo && <p className="mt-1.5 text-[13px] text-red-600">{errors.photo}</p>}
             </div>
 
+            {/* Nama Produk */}
+            <div className="mt-8">
+              <label htmlFor="name" className="block text-[14px] font-medium">Nama Produk / Material</label>
+              <p className="mt-0.5 text-[12px] text-circlo-ink/80">
+                Sebutkan nama singkat material, misalnya &quot;Perca kain katun hitam&quot; atau &quot;Palet kayu bekas&quot;.
+              </p>
+              <input
+                id="name"
+                name="name"
+                type="text"
+                value={form.name}
+                onChange={setField('name')}
+                placeholder="Perca kain katun hitam"
+                className={`${fieldClass()} mt-2 h-[46px] px-4`}
+              />
+            </div>
+
             {/* Deskripsi */}
             <div className="mt-8">
-              <label htmlFor="description" className="block text-[14px] font-medium">Description</label>
+              <div className="flex items-center justify-between gap-3">
+                <label htmlFor="description" className="block text-[14px] font-medium">Description</label>
+                <button
+                  type="button"
+                  onClick={onGenerateDescription}
+                  disabled={aiLoading}
+                  className="flex items-center gap-1.5 rounded-lg border border-circlo-green/50 px-3 py-1.5 text-[12px] font-medium text-circlo-green transition hover:bg-circlo-soft disabled:opacity-60"
+                >
+                  {aiLoading ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  {aiLoading ? 'Menyusun...' : 'Bantu dengan AI'}
+                </button>
+              </div>
               <p className="mt-0.5 flex items-center gap-1.5 text-[12px] font-semibold text-circlo-ink/80">
                 <Sparkles className="h-3.5 w-3.5 text-circlo-green" />
                 Tuliskan deskripsi singkat material Anda, seperti jenis, kondisi, dan detail lainnya.
               </p>
+              {aiError && <p className="mt-1 text-[13px] text-red-600">{aiError}</p>}
               <textarea
                 id="description"
                 name="description"
@@ -291,6 +352,27 @@ function UploadMaterialForm() {
                 <input id="condition" name="condition" type="text" value={form.condition} onChange={setField('condition')} placeholder="Bersih dan kering" className={`${fieldClass(errors.condition)} h-[46px] pl-11 pr-4`} />
               </div>
               {errors.condition && <p className="mt-1 text-[13px] text-red-600">{errors.condition}</p>}
+            </div>
+
+            {/* Satuan */}
+            <div className="mt-6">
+              <label htmlFor="satuan" className="block text-[14px] font-medium">Satuan</label>
+              <p className="mt-0.5 text-[12px] text-circlo-ink/80">
+                Pilih satuan jumlah material. Nilai ini dipakai AI untuk mencocokkan bahan dengan resep usaha.
+              </p>
+              <select
+                id="satuan"
+                name="satuan"
+                value={form.satuan}
+                onChange={setField('satuan')}
+                className={`${fieldClass(errors.satuan)} mt-2 h-[46px] px-4`}
+              >
+                <option value="" disabled>Pilih satuan</option>
+                <option value="kg">kg — Kilogram</option>
+                <option value="m2">m² — Meter persegi</option>
+                <option value="pcs">pcs — Buah / Potong</option>
+              </select>
+              {errors.satuan && <p className="mt-1 text-[13px] text-red-600">{errors.satuan}</p>}
             </div>
 
             {/* Lokasi */}
