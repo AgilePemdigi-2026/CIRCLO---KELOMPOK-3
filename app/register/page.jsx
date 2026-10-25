@@ -17,6 +17,14 @@ import {
 } from "@/components/auth/AuthFields";
 import { createClient } from "../../lib/supabase/client";
 
+// Teks mengikuti user story 5.1 (Login / Register)
+const TEXT = {
+  success: "Registration successful",
+  existing: "Registration failed. Email is already registered.",
+  incomplete: "Registration failed. Please complete all data.",
+  shortPassword: "Registration failed. Password must be at least 6 characters.",
+};
+
 export default function RegisterPage() {
   const router = useRouter();
   const supabase = createClient();
@@ -25,13 +33,17 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("buyer");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
+
+  const fail = (text) => {
+    setIsError(true);
+    setMessage(text);
+    setLoading(false);
+  };
 
   const handleRegister = async (e) => {
     e.preventDefault();
@@ -42,27 +54,18 @@ export default function RegisterPage() {
     const cleanEmail = email.trim().toLowerCase();
     const cleanNama = nama.trim();
 
-    if (!cleanNama || !cleanEmail || !password || !confirmPassword) {
-      setIsError(true);
-      setMessage("Semua data harus diisi.");
-      return;
+    // Data tidak lengkap
+    if (!cleanNama || !cleanEmail || !password) {
+      return fail(TEXT.incomplete);
     }
 
     if (password.length < 6) {
-      setIsError(true);
-      setMessage("Password minimal 6 karakter.");
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setIsError(true);
-      setMessage("Konfirmasi password tidak sesuai.");
-      return;
+      return fail(TEXT.shortPassword);
     }
 
     setLoading(true);
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email: cleanEmail,
       password,
       options: {
@@ -73,17 +76,22 @@ export default function RegisterPage() {
       },
     });
 
+    // Email sudah terdaftar (error langsung dari Supabase)
     if (error) {
-      setIsError(true);
-      setMessage(error.message);
-      setLoading(false);
-      return;
+      const exists = /already|registered|exists/i.test(error.message);
+      return fail(exists ? TEXT.existing : `Registration failed. ${error.message}`);
     }
 
-    setIsError(false);
-    setMessage("Registrasi berhasil. Mengarahkan ke halaman masuk...");
+    // Pada beberapa pengaturan Supabase, email yang sudah ada tidak memberi
+    // error, tetapi mengembalikan identities kosong
+    if (data?.user?.identities?.length === 0) {
+      return fail(TEXT.existing);
+    }
 
-    router.push("/login");
+    // Berhasil: tampilkan pesan, lalu pindah ke /login
+    setIsError(false);
+    setMessage(TEXT.success);
+    setTimeout(() => router.push("/login"), 1500);
   };
 
   return (
@@ -93,26 +101,29 @@ export default function RegisterPage() {
       subtitle="Mulai perjalanan kepedulian Anda."
     >
       <form onSubmit={handleRegister} className="space-y-3.5">
-        <AuthField label="Nama Lengkap" icon={<UserIcon />}>
+        <AuthField label="Full Name" icon={<UserIcon />}>
           <AuthInput
             type="text"
+            aria-label="Full Name"
             value={nama}
             onChange={(e) => setNama(e.target.value)}
             placeholder="Nama lengkap"
           />
         </AuthField>
 
-        <AuthField label="Alamat Email" icon={<MailIcon />}>
+        <AuthField label="Email" icon={<MailIcon />}>
           <AuthInput
             type="email"
+            aria-label="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="relawan@komunitas.org"
           />
         </AuthField>
 
-        <AuthField label="Daftar Sebagai" icon={<RoleIcon />}>
+        <AuthField label="Role" icon={<RoleIcon />}>
           <select
+            aria-label="Role"
             value={role}
             onChange={(e) => setRole(e.target.value)}
             className={inputClass}
@@ -123,13 +134,13 @@ export default function RegisterPage() {
         </AuthField>
 
         <AuthField
-          label="Kata Sandi"
+          label="Password"
           icon={<LockIcon />}
           action={
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              aria-label="Tampilkan atau sembunyikan kata sandi"
+              aria-label="Tampilkan atau sembunyikan password"
             >
               <EyeIcon off={showPassword} />
             </button>
@@ -137,30 +148,10 @@ export default function RegisterPage() {
         >
           <AuthInput
             type={showPassword ? "text" : "password"}
+            aria-label="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Minimal 6 karakter"
-          />
-        </AuthField>
-
-        <AuthField
-          label="Konfirmasi Kata Sandi"
-          icon={<LockIcon />}
-          action={
-            <button
-              type="button"
-              onClick={() => setShowConfirm(!showConfirm)}
-              aria-label="Tampilkan atau sembunyikan konfirmasi kata sandi"
-            >
-              <EyeIcon off={showConfirm} />
-            </button>
-          }
-        >
-          <AuthInput
-            type={showConfirm ? "text" : "password"}
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            placeholder="Ulangi kata sandi"
           />
         </AuthField>
 
@@ -180,7 +171,7 @@ export default function RegisterPage() {
           className="flex w-full items-center justify-center gap-2 rounded-md py-2.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
           style={{ backgroundColor: GREEN }}
         >
-          {loading ? "Mendaftarkan..." : "Daftar"}
+          {loading ? "Registering..." : "Register"}
           {!loading && <ArrowRight className="h-4 w-4" />}
         </button>
       </form>
