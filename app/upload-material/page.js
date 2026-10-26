@@ -1,10 +1,10 @@
 'use client';
 
-import { Suspense, useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import {
-  Archive, Banknote, Bot, CircleAlert, CircleCheck, ClipboardCheck, LoaderCircle, MapPin, Sparkles, TriangleAlert,
+  Archive, Banknote, Bot, CircleAlert, CircleCheck, ClipboardCheck, ImagePlus, LoaderCircle, MapPin, Sparkles, TriangleAlert,
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -15,18 +15,23 @@ import { fileToResizedDataUrl } from '@/lib/image';
 import { getMaterial, isDemoStore, updateMaterial } from '@/lib/materials';
 import { clearDraft, clearResult, loadDraft, loadResult, saveDraft, saveResult } from '@/lib/storage';
 
-const SAMPLE_PHOTO = '/images/kain-katun-hitam.jpg';
-const EMPTY_FORM = { name: '', description: '', quantity: '', condition: '', price: '', location: '', satuan: '' };
+const EMPTY_FORM = { name: '', description: '', quantity: '', condition: '', price: '', location: '', satuan: 'kg' };
+const SATUAN_VALID = ['kg', 'm2', 'pcs'];
+const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 const isDataUrl = (v) => typeof v === 'string' && v.startsWith('data:');
+const newUploadToken = () =>
+  globalThis.crypto?.randomUUID?.() || `upload-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
 function validate(form, photo) {
   const errors = {};
+  const quantity = Number(form.quantity);
+  const price = Number(form.price);
   if (form.description.trim().length < 5) errors.description = 'Deskripsi wajib diisi (minimal 5 karakter)';
-  if (!(Number(form.quantity) > 0)) errors.quantity = 'Jumlah wajib diisi';
+  if (!Number.isInteger(quantity) || quantity <= 0) errors.quantity = 'Jumlah wajib berupa angka bulat lebih dari 0';
   if (!form.condition.trim()) errors.condition = 'Kondisi wajib diisi';
-  if (form.price === '' || Number(form.price) < 0) errors.price = 'Harga wajib diisi';
-  if (!['kg', 'm2', 'pcs'].includes(form.satuan)) errors.satuan = 'Satuan wajib dipilih';
+  if (form.price.trim() === '' || !Number.isFinite(price) || price < 0) errors.price = 'Harga wajib berupa angka 0 atau lebih';
+  if (form.satuan && !SATUAN_VALID.includes(form.satuan)) errors.satuan = 'Satuan tidak valid';
   if (!form.location.trim()) errors.location = 'Lokasi wajib diisi';
   if (!photo) errors.photo = 'Foto wajib diunggah';
   return errors;
@@ -43,11 +48,111 @@ const NOTICE_STYLE = {
   success: 'border-circlo-lime/60 bg-circlo-soft text-circlo-green',
 };
 
+const CONFIDENCE_LABEL = {
+  tinggi: 'Keyakinan AI: tinggi',
+  sedang: 'Keyakinan AI: sedang',
+  rendah: 'Keyakinan AI: rendah, periksa dengan teliti',
+};
+
+function AiSection({ title, children }) {
+  return (
+    <div>
+      <p className="mb-1.5 text-[13px] font-semibold text-circlo-ink">{title}</p>
+      {children}
+    </div>
+  );
+}
+
+function BulletList({ items, empty }) {
+  if (!items?.length) return <p className="text-[13px] text-circlo-muted">{empty}</p>;
+  return (
+    <ul className="list-disc space-y-1 pl-5 text-[13.5px] text-circlo-ink/90">
+      {items.map((item, i) => <li key={i}>{item}</li>)}
+    </ul>
+  );
+}
+
+// Kartu hasil analisis AI (ditampilkan di bawah kolom Description)
+function AiResultCard({ result }) {
+  const lowConfidence = result.confidence === 'rendah';
+  return (
+    <div className="mt-4 space-y-4 rounded-xl border border-circlo-line bg-white p-5">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h3 className="text-[16px] font-semibold text-circlo-ink">Hasil Analisis AI</h3>
+          <p className="mt-0.5 text-[13px] text-circlo-muted">Periksa kembali informasi ini sebelum menyimpan produk.</p>
+        </div>
+        {result.confidence && (
+          <span className={`rounded-full px-3 py-1 text-[12px] font-medium ${lowConfidence ? 'bg-amber-50 text-amber-900' : 'bg-circlo-soft text-circlo-green'}`}>
+            {CONFIDENCE_LABEL[result.confidence] || result.confidence}
+          </span>
+        )}
+      </div>
+
+      <AiSection title="Kategori">
+        <p className="text-[14px] font-medium text-circlo-ink">{result.category || 'Belum diketahui'}</p>
+        {result.subcategory && <p className="text-[13px] text-circlo-muted">Subkategori: {result.subcategory}</p>}
+        {result.composition && <p className="mt-1 text-[13px] text-circlo-ink/90">Komposisi: {result.composition}</p>}
+      </AiSection>
+
+      <AiSection title="Spesifikasi Material">
+        {result.specifications?.length ? (
+          <div className="space-y-1.5">
+            {result.specifications.map((s, i) => (
+              <div key={`${s.label}-${i}`} className="flex justify-between gap-4 border-b border-circlo-line pb-1.5 text-[13.5px]">
+                <span className="text-circlo-muted">{s.label}</span>
+                <span className="text-right text-circlo-ink">{s.value}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-[13px] text-circlo-muted">Belum ada spesifikasi.</p>
+        )}
+      </AiSection>
+
+      <AiSection title="Potensi Pemanfaatan">
+        <BulletList items={result.potential_uses} empty="Belum tersedia rekomendasi pemanfaatan." />
+      </AiSection>
+
+      <AiSection title="Catatan untuk Buyer">
+        <BulletList items={result.buyer_notes} empty="Tidak ada catatan tambahan." />
+      </AiSection>
+
+      {result.perlu_konfirmasi?.length > 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+          <p className="mb-1 text-[13px] font-semibold text-amber-900">Mohon dikonfirmasi oleh Seller</p>
+          <ul className="list-disc space-y-0.5 pl-5 text-[13px] text-amber-900">
+            {result.perlu_konfirmasi.map((t, i) => <li key={i}>{t}</li>)}
+          </ul>
+        </div>
+      )}
+
+      <AiSection title="Tag Material">
+        <div className="flex flex-wrap gap-2">
+          {result.tags?.length ? (
+            result.tags.map((tag, i) => (
+              <span key={`${tag}-${i}`} className="rounded-full bg-circlo-soft px-3 py-1 text-[12.5px] text-circlo-green">
+                #{String(tag).replace(/^#/, '')}
+              </span>
+            ))
+          ) : (
+            <p className="text-[13px] text-circlo-muted">Belum ada tag.</p>
+          )}
+        </div>
+      </AiSection>
+
+      <p className="text-[12px] text-circlo-muted">
+        Hasil AI merupakan rekomendasi awal berdasarkan foto dan isian Anda, bukan verifikasi fisik material.
+        Pastikan seluruh informasi sesuai dengan kondisi material yang sebenarnya.
+      </p>
+    </div>
+  );
+}
+
 function UploadMaterialForm() {
   const router = useRouter();
   const editId = useSearchParams().get('id'); // ada id = mode Edit material (dari tombol Edit di My Materials)
   const isEdit = Boolean(editId);
-  const fileRef = useRef(null);
 
   const [form, setForm] = useState(EMPTY_FORM);
   const [photo, setPhoto] = useState(null); // { dataUrl, name, sizeKb, remote? }
@@ -55,8 +160,9 @@ function UploadMaterialForm() {
   const [notice, setNotice] = useState(null); // { type: 'error' | 'warning' | 'success', text }
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
+  const [aiResult, setAiResult] = useState(null);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // Isi form: (1) kembali dari halaman hasil lewat tombol Edit, (2) mode edit material, (3) draf tersimpan
   useEffect(() => {
@@ -74,13 +180,13 @@ function UploadMaterialForm() {
           if (!active) return;
           setForm({
             ...EMPTY_FORM,
-            name: m.nama || '', // TODO: sesuaikan nama field dengan skema tabel materials
-            description: m.deskripsi || '',
-            quantity: String(m.jumlah ?? ''),
-            condition: m.kondisi_seller || '',
+            name: m.nama || m.nama_material || '',
+            description: m.deskripsi || m.deskripsi_material || '',
+            quantity: String(m.jumlah ?? m.stok ?? ''),
+            condition: m.kondisi_seller || m.kondisi || '',
             price: String(m.harga ?? ''),
             location: m.lokasi || '',
-            satuan: m.satuan || '', // TODO: sesuaikan nama field dengan skema tabel materials
+            satuan: m.satuan || 'kg',
           });
           setPhoto(m.foto_url ? { dataUrl: m.foto_url, name: 'Foto material', remote: true } : null);
         } catch {
@@ -107,15 +213,20 @@ function UploadMaterialForm() {
   async function onPickPhoto(e) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      setErrors((er) => ({ ...er, photo: 'File harus berupa gambar' }));
+    if (!PHOTO_TYPES.includes(file.type)) {
+      setPhoto(null);
+      e.target.value = '';
+      setErrors((er) => ({ ...er, photo: 'Foto harus berformat JPG, PNG, atau WebP' }));
       return;
     }
     try {
       const dataUrl = await fileToResizedDataUrl(file);
       setPhoto({ dataUrl, name: file.name, sizeKb: Math.round(file.size / 1024) });
       setErrors((er) => ({ ...er, photo: undefined }));
+      setAiResult(null); // hasil AI sebelumnya sudah tidak sesuai dengan foto baru
+      setAiError('');
     } catch (err) {
+      e.target.value = '';
       setErrors((er) => ({ ...er, photo: err.message }));
     }
   }
@@ -157,29 +268,57 @@ function UploadMaterialForm() {
     }
   }
 
+  // "Bantu dengan AI": kirim FOTO + isian ke server, isi deskripsi (dan nama/kondisi bila masih kosong)
   async function onGenerateDescription() {
-    const name = form.name.trim();
-    const description = form.description.trim();
-    if (!name && !description) {
-      setAiError('Isi dulu nama produk atau deskripsi singkat.');
+    setAiError('');
+    if (!photo) {
+      setAiError('Unggah foto material dulu supaya AI bisa melihat barangnya.');
       return;
     }
-    setAiError('');
-    setAiLoading(true);
+    if (!isDataUrl(photo.dataUrl)) {
+      setAiError('Untuk foto yang sudah tersimpan, unggah ulang foto agar AI bisa menganalisisnya.');
+      return;
+    }
+    if (!form.name.trim() && form.description.trim().length < 3) {
+      setAiError('Isi nama material atau deskripsi singkat dulu.');
+      return;
+    }
+
+    setIsGenerating(true);
     try {
+      const token = await getAccessToken();
       const res = await fetch('/api/generate-description', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, description }),
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          name: form.name,
+          description: form.description,
+          quantity: form.quantity,
+          price: form.price,
+          condition: form.condition,
+          satuan: form.satuan,
+          location: form.location,
+          image: photo.dataUrl,
+        }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Gagal membuat deskripsi.');
-      setForm((f) => ({ ...f, description: data.description }));
-      setErrors((er) => ({ ...er, description: undefined }));
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Gagal membuat deskripsi dengan AI.');
+
+      setAiResult(data);
+      setForm((prev) => ({
+        ...prev,
+        name: prev.name.trim() ? prev.name : data.name || prev.name,                       // isi hanya jika kosong
+        description: data.description || prev.description,                                  // deskripsi diganti hasil AI
+        condition: prev.condition.trim() ? prev.condition : data.condition || prev.condition, // isi hanya jika kosong
+      }));
+      setErrors((er) => ({ ...er, description: undefined, condition: undefined }));
     } catch (err) {
-      setAiError(err.message || 'Terjadi kesalahan, coba lagi.');
+      setAiError(err.message || 'Terjadi kesalahan saat menghubungi AI.');
     } finally {
-      setAiLoading(false);
+      setIsGenerating(false);
     }
   }
 
@@ -193,6 +332,7 @@ function UploadMaterialForm() {
       return;
     }
     setLoading(true);
+    const normalizedForm = { ...form, satuan: form.satuan || 'kg' };
 
     try {
       const token = await getAccessToken();
@@ -200,11 +340,11 @@ function UploadMaterialForm() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({
-          description: form.description,
-          quantity: form.quantity,
-          price: form.price,
-          location: form.location,
-          condition: form.condition,
+          description: normalizedForm.description,
+          quantity: normalizedForm.quantity,
+          price: normalizedForm.price,
+          location: normalizedForm.location,
+          condition: normalizedForm.condition,
           image: isDataUrl(photo.dataUrl) ? photo.dataUrl : null, // foto lama (URL) tidak dikirim ulang ke AI
         }),
       });
@@ -221,8 +361,19 @@ function UploadMaterialForm() {
         setLoading(false);
         return;
       }
-      if (!isEdit) saveDraft({ form, photo });
-      saveResult({ form, photo, result: data, editId: editId || null });
+      if (!isEdit) saveDraft({ form: normalizedForm, photo });
+      const saved = saveResult({
+        form: normalizedForm,
+        photo,
+        result: data,
+        editId: editId || null,
+        uploadToken: newUploadToken(),
+      });
+      if (!saved) {
+        setNotice({ type: 'error', text: 'Hasil klasifikasi tidak dapat disimpan di browser. Coba lagi.' });
+        setLoading(false);
+        return;
+      }
       router.push('/upload-material/result');
     } catch {
       setNotice({ type: 'error', text: 'Koneksi bermasalah. Periksa jaringan Anda lalu coba lagi.' });
@@ -254,24 +405,35 @@ function UploadMaterialForm() {
 
             {/* Foto */}
             <div className="mt-5">
-              <label htmlFor="photo" className="text-[14px] font-medium">Photo</label>
+              <label htmlFor="photo" className="block text-[14px] font-medium">Photo</label>
               <div className={`mt-3 rounded-xl border bg-white p-3 ${errors.photo ? 'border-red-500' : 'border-circlo-line'}`}>
-                <div className="relative h-[96px] w-full overflow-hidden rounded-lg">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={photo ? photo.dataUrl : SAMPLE_PHOTO} alt="Pratinjau foto material" className="h-full w-full object-cover" />
-                </div>
-                <p className="mt-4 text-[14px] font-semibold">{photo ? photo.name : 'Foto material contoh'}</p>
-                <p className="mt-1 text-[14px] text-circlo-muted">
-                  {photo ? `${photo.sizeKb ? `${photo.sizeKb} KB — ` : ''}pratinjau material yang diunggah.` : 'Foto kain katun hitam — pratinjau material yang diunggah.'}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => fileRef.current?.click()}
-                  className="mt-3 rounded-lg bg-circlo-green px-6 py-2.5 text-[14px] font-medium text-white transition hover:brightness-110"
-                >
-                  Ganti Foto
-                </button>
-                <input ref={fileRef} type="file" id="photo" name="photo" accept="image/*" onChange={onPickPhoto} className="sr-only" tabIndex={-1} />
+                {photo ? (
+                  <>
+                    <div className="relative h-[96px] w-full overflow-hidden rounded-lg">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={photo.dataUrl} alt="Pratinjau foto material" className="h-full w-full object-cover" />
+                    </div>
+                    <p className="mt-4 text-[14px] font-semibold">{photo.name}</p>
+                    <p className="mt-1 text-[14px] text-circlo-muted">
+                      {photo.sizeKb ? `${photo.sizeKb} KB — ` : ''}pratinjau material yang diunggah.
+                    </p>
+                  </>
+                ) : (
+                  <div className="flex h-[96px] w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-circlo-fieldline bg-circlo-field text-circlo-muted">
+                    <ImagePlus className="h-6 w-6" />
+                    <span className="text-[13px] font-medium">Belum ada foto dipilih</span>
+                  </div>
+                )}
+                <input
+                  id="photo"
+                  name="photo"
+                  type="file"
+                  accept={PHOTO_TYPES.join(',')}
+                  onChange={onPickPhoto}
+                  aria-describedby="photo-help"
+                  className="mt-3 block w-full cursor-pointer rounded-lg border border-circlo-fieldline bg-circlo-field text-[13px] text-circlo-ink file:mr-3 file:border-0 file:bg-circlo-green file:px-4 file:py-2.5 file:text-[13px] file:font-medium file:text-white hover:file:brightness-110"
+                />
+                <p id="photo-help" className="mt-2 text-[12.5px] text-circlo-muted">Format JPG, PNG, atau WebP. Foto wajib diunggah.</p>
               </div>
               {errors.photo && <p className="mt-1.5 text-[13px] text-red-600">{errors.photo}</p>}
             </div>
@@ -300,18 +462,23 @@ function UploadMaterialForm() {
                 <button
                   type="button"
                   onClick={onGenerateDescription}
-                  disabled={aiLoading}
+                  disabled={isGenerating}
                   className="flex items-center gap-1.5 rounded-lg border border-circlo-green/50 px-3 py-1.5 text-[12px] font-medium text-circlo-green transition hover:bg-circlo-soft disabled:opacity-60"
                 >
-                  {aiLoading ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                  {aiLoading ? 'Menyusun...' : 'Bantu dengan AI'}
+                  {isGenerating ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  {isGenerating ? 'Menganalisis foto...' : 'Bantu dengan AI'}
                 </button>
               </div>
               <p className="mt-0.5 flex items-center gap-1.5 text-[12px] font-semibold text-circlo-ink/80">
                 <Sparkles className="h-3.5 w-3.5 text-circlo-green" />
                 Tuliskan deskripsi singkat material Anda, seperti jenis, kondisi, dan detail lainnya.
               </p>
-              {aiError && <p className="mt-1 text-[13px] text-red-600">{aiError}</p>}
+              {aiError && (
+                <p role="alert" className="mt-2 flex items-start gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+                  <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                  {aiError}
+                </p>
+              )}
               <textarea
                 id="description"
                 name="description"
@@ -319,9 +486,12 @@ function UploadMaterialForm() {
                 onChange={setField('description')}
                 placeholder="Sisa kain katun hitam"
                 rows={4}
+                maxLength={2000}
                 className={`${fieldClass(errors.description)} mt-2 h-[100px] resize-none px-4 py-3`}
               />
               {errors.description && <p className="mt-1 text-[13px] text-red-600">{errors.description}</p>}
+
+              {aiResult && <AiResultCard result={aiResult} />}
             </div>
 
             {/* Quantity + Price */}
@@ -330,7 +500,7 @@ function UploadMaterialForm() {
                 <label htmlFor="quantity" className="block text-[14px] font-medium">Quantity</label>
                 <div className="relative mt-2">
                   <Archive className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-circlo-muted" />
-                  <input id="quantity" name="quantity" type="number" min="0" value={form.quantity} onChange={setField('quantity')} placeholder="250" className={`${fieldClass(errors.quantity)} h-[46px] pl-11 pr-4`} />
+                  <input id="quantity" name="quantity" type="number" min="1" step="1" value={form.quantity} onChange={setField('quantity')} placeholder="250" className={`${fieldClass(errors.quantity)} h-[46px] pl-11 pr-4`} />
                 </div>
                 {errors.quantity && <p className="mt-1 text-[13px] text-red-600">{errors.quantity}</p>}
               </div>

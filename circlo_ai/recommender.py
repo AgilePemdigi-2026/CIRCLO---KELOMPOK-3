@@ -4,11 +4,11 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from .catalog import region_candidates
+from .catalog import region_candidates, find_alternative_materials
 
 # Bobot skor (jumlah = 1.0). Ubah di sini untuk tuning.
 W_LOKASI, W_STOK, W_MODAL, W_SEM = 0.35, 0.20, 0.20, 0.25
-LEVEL_SCORE = {"kota": 1.0, "provinsi": 0.6, "semua": 0.3}
+LEVEL_SCORE = {"kota": 1.0, "provinsi": 0.6, "semua": 0.3, "alternatif": 0.15}
 MODAL_TOLERANSI = 1.2  # resep masih ditampilkan "mepet" bila modal awal <= 1,2 x modal user
 
 
@@ -58,9 +58,20 @@ class Recommender:
 
         rows: list[Rec] = []
         for r in self.resep_list:
+            # Coba pencocokan ketat dulu (kategori + satuan + keyword)
             cands, level = region_candidates(r, materials, state.kota, state.provinsi)
+            
+            # Fallback ke material alternatif jika pencocokan ketat gagal
+            used_alternative = False
+            if not cands:
+                cands = find_alternative_materials(r, materials, state.kota, state.provinsi)
+                if cands:
+                    level = "alternatif"
+                    used_alternative = True
+            
             if not cands:
                 continue  # tidak ada bahan di katalog -> jangan direkomendasikan
+            
             status, modal_fit = self._modal_status(r, state.modal)
             stok_total = sum(m["stok"] for m in cands)
             unit_mungkin = stok_total * (1 - r["persen_susut"]) / r["bahan_per_unit"]

@@ -3,7 +3,7 @@ modelnya menerima data yang sama (resep, material, hasil hitung) dan hanya meran
 from __future__ import annotations
 
 from .calculator import hitung_kebutuhan, rencana_beli
-from .catalog import region_candidates, regional_summary
+from .catalog import region_candidates, regional_summary, find_alternative_materials
 
 
 # ---------- format angka ----------
@@ -21,8 +21,26 @@ def _persen(x: float) -> str:
 
 
 def _mat_line(m: dict) -> str:
+    alt_flag = " (alternatif)" if m.get("_match_type") == "alternatif" else ""
     return (f"{m['nama_material']} ({fmt_rp(m['harga'])}/{m['satuan']}, "
-            f"stok {fmt_num(m['stok'])} {m['satuan']}, {m['kota']})")
+            f"stok {fmt_num(m['stok'])} {m['satuan']}, {m['kota']}){alt_flag}")
+
+
+def _resep_detail(resep: dict) -> list[str]:
+    """Susun detail resep yang informatif."""
+    lines = []
+    if resep.get("langkah_singkat"):
+        lines.append(f"Langkah: {resep['langkah_singkat']}")
+    if resep.get("catatan_k3"):
+        lines.append(f"Keselamatan: {resep['catatan_k3']}")
+    # Informasi tambahan dari resep
+    if resep.get("bahan_per_unit") and resep.get("satuan"):
+        lines.append(f"Kebutuhan material per unit: {fmt_num(resep['bahan_per_unit'])} {resep['satuan']}")
+    if resep.get("persen_susut"):
+        lines.append(f"Estimasi susut bahan: {_persen(resep['persen_susut'])}")
+    if resep.get("estimasi_modal"):
+        lines.append(f"Estimasi modal awal: {fmt_rp(resep['estimasi_modal'])} (kasar)")
+    return lines
 
 
 # ---------- discovery ----------
@@ -68,8 +86,15 @@ def recommend_text(state, recs, info, materials) -> str:
         modal_txt = f"modal awal sekitar {fmt_rp(est)}" if est else "modal awal belum diestimasi"
         flag = {"mepet": " (agak mepet)", "kurang": " (di atas modalmu)"}.get(r.modal_status, "")
         lines.append(f"{i}. {r.resep['nama_produk']}: {modal_txt}{flag}")
+        # Tampilkan bahan utama
         for m in r.kandidat[:2]:
             lines.append(f"   Bahan: {_mat_line(m)}")
+        # Tampilkan detail resep singkat
+        for detail in _resep_detail(r.resep):
+            lines.append(f"   {detail}")
+        # Info jika pakai material alternatif
+        if r.level == "alternatif":
+            lines.append("   ⚠ Material alternatif (kategori/satuan mirip, bukan pencocokan pasti)")
     lines.append("")
     tail = ("Mau lanjut ke yang mana? Aku bisa jelaskan cara membuatnya, hitung kebutuhan bahan, "
             "atau bahas modal dan langkah memulainya.")
@@ -92,6 +117,12 @@ def cara_text(resep, cands, intro: bool) -> str:
         lines.append(f"Keselamatan: {resep['catatan_k3']}")
     if cands:
         lines.append(f"Bahan di katalog: {_mat_line(cands[0])}")
+        # Tampilkan alternatif jika ada
+        if len(cands) > 1:
+            lines.append(f"Alternatif: {_mat_line(cands[1])}")
+    # Detail resep lengkap
+    for detail in _resep_detail(resep):
+        lines.append(f"- {detail}")
     lines.append("Mau aku hitung kebutuhan bahan untuk jumlah produksi tertentu?")
     return "\n".join(lines)
 
@@ -101,7 +132,15 @@ def ask_qty_text(resep) -> str:
 
 
 def hitung_text(resep, qty, state, materials) -> tuple[str, list[int]]:
+    # Coba pencocokan ketat dulu
     cands, level = region_candidates(resep, materials, state.kota, state.provinsi)
+    used_alternative = False
+    if not cands:
+        # Fallback ke material alternatif
+        from .catalog import find_alternative_materials
+        cands = find_alternative_materials(resep, materials, state.kota, state.provinsi)
+        used_alternative = bool(cands)
+    
     sat = resep["satuan"]
     bpu, susut = resep["bahan_per_unit"], resep["persen_susut"]
     need = hitung_kebutuhan(qty, bpu, susut, sat)
@@ -110,6 +149,8 @@ def hitung_text(resep, qty, state, materials) -> tuple[str, list[int]]:
         f"- Kebutuhan bahan: {fmt_num(qty)} x {fmt_num(bpu)} {sat} / (1 - {_persen(susut)} susut) "
         f"= {fmt_num(need)} {sat}",
     ]
+    if used_alternative:
+        lines.append("⚠ Menggunakan material alternatif (pencocokan kategori/satuan mirip).")
     if not cands:
         lines.append("Belum ada bahan yang cocok di katalog Circlo untuk produk ini.")
         return "\n".join(lines), []
@@ -170,3 +211,211 @@ def fallback_text() -> str:
     return ("Untuk saat ini aku fokus bantu usaha dari material daur ulang. Kamu bisa tanya: "
             "cara membuat produk, hitung kebutuhan bahan, estimasi modal, atau langkah memulai usaha. "
             "Atau ubah kota/modal kalau mau rekomendasi baru.")
+
+
+# ---------- katalog material ----------
+def _scope_label(state, found) -> str:
+    if found.get("scope") == "kota" and found.get("kota"):
+        return f"di {found['kota']}"
+    if found.get("scope") == "provinsi" and found.get("provinsi"):
+        return f"di {found['provinsi']}"
+    return "di seluruh katalog Circlo"
+
+
+def _material_item_line(i: int, m: dict) -> str:
+    lokasi = m.get("kota") or "-"
+    prov = f", {m['provinsi']}" if m.get("provinsi") and m.get("provinsi") != lokasi else ""
+    desc = (m.get("deskripsi_material") or "").strip()
+    if len(desc) > 90:
+        desc = desc[:87].rstrip() + "..."
+    line = (f"{i}. {m['nama_material']} - {fmt_rp(m['harga'])}/{m.get('satuan') or 'unit'}, "
+            f"stok {fmt_num(m['stok'])} {m.get('satuan') or 'unit'}, {lokasi}{prov}")
+    if desc:
+        line += f". {desc}"
+    return line
+
+
+def katalog_text(state, found: dict, cards: list[dict]) -> str:
+    scope = _scope_label(state, found)
+    query = found.get("query")
+    filters = []
+    if found.get("kategori"):
+        filters.append("kategori " + ", ".join(found["kategori"]))
+    if found.get("max_harga"):
+        filters.append(f"harga maksimal {fmt_rp(found['max_harga'])}")
+    filter_txt = f" dengan filter {' dan '.join(filters)}" if filters else ""
+    if query:
+        head = (f"Aku menemukan {found['total']} material{filter_txt} untuk "
+                f'"{query}" {scope}.')
+    else:
+        head = f"Ada {found['total']} material aktif dan siap dibeli {scope}{filter_txt}."
+    lines = [head]
+    if found["total"] > len(cards):
+        lines.append(f"Menampilkan {len(cards)} teratas:")
+    else:
+        lines.append("Ini daftarnya:")
+    lines.append("")
+    for i, m in enumerate(cards, 1):
+        lines.append(_material_item_line(i, m))
+    lines.append("")
+    if found["total"] > len(cards):
+        lines.append(f"Masih ada {found['total'] - len(cards)} material lain. "
+                     'Ketik "tampilkan semua" atau sebut kategori/kota untuk mempersempit.')
+    lines.append('Pilih nomor material untuk melihat detail, atau ketik "pesan <nomor> <jumlah>" '
+                 "kalau sudah cocok.")
+    return "\n".join(lines)
+
+
+def katalog_alternatif_text(state, found: dict, cards: list[dict]) -> str:
+    scope = _scope_label(state, found)
+    query = found.get("query")
+    lines = []
+    if query:
+        lines.append(f'Belum ada material yang persis cocok untuk "{query}" {scope}.')
+    else:
+        lines.append(f"Belum ada material yang cocok dengan filter itu {scope}.")
+    lines.append("Tapi ada beberapa alternatif yang masih relevan dan stoknya tersedia:")
+    lines.append("")
+    for i, m in enumerate(cards, 1):
+        lines.append(_material_item_line(i, m))
+    lines.append("")
+    lines.append('Ketik nomor untuk detail, atau sebut "semua wilayah" untuk mencari di luar kota ini.')
+    return "\n".join(lines)
+
+
+def katalog_luar_kota_text(state, found: dict, elsewhere: dict, cards: list[dict]) -> str:
+    query = found.get("query")
+    local = found.get("kota") or found.get("provinsi") or "wilayah ini"
+    if query:
+        head = f'Di {local} belum ada material yang cocok untuk "{query}".'
+    else:
+        head = f"Di {local} belum ada material yang cocok dengan filter itu."
+    lines = [head,
+             f"Tapi di kota lain ada {elsewhere['total']} material yang cocok. Ini beberapa:",
+             ""]
+    for i, m in enumerate(cards, 1):
+        lines.append(_material_item_line(i, m))
+    lines.append("")
+    lines.append('Ketik "semua wilayah" untuk mencari seluruh katalog, atau sebut kota lain.')
+    return "\n".join(lines)
+
+
+def katalog_kosong_text(state, found: dict) -> str:
+    scope = _scope_label(state, found)
+    query = found.get("query")
+    if query:
+        head = f'Belum ada material aktif yang cocok untuk "{query}" {scope}.'
+    else:
+        head = f"Belum ada material aktif yang cocok dengan filter itu {scope}."
+    tips = ["coba kategori lain (kayu, tekstil, plastik, kertas, logam, organik)",
+            "naikkan batas anggaran",
+            'ketik "semua wilayah" untuk melihat katalog di luar kotamu']
+    return head + " Kamu bisa " + "; ".join(tips) + "."
+
+
+def katalog_stats_text(state, found: dict, cards: list[dict]) -> str:
+    scope = _scope_label(state, found)
+    query = found.get("query")
+    filters = []
+    if found.get("kategori"):
+        filters.append("kategori " + ", ".join(found["kategori"]))
+    if found.get("max_harga"):
+        filters.append(f"harga maksimal {fmt_rp(found['max_harga'])}")
+    filter_txt = f" dengan filter {' dan '.join(filters)}" if filters else ""
+    if query:
+        head = f'Ada {found["total"]} material{filter_txt} yang cocok untuk "{query}" {scope}.'
+    else:
+        head = f"Ada {found['total']} material aktif dan tersedia {scope}{filter_txt}."
+    lines = [head]
+    stats = found.get("_katalog_stats") or {}
+    if not query and not filters and found.get("scope") == "all" and stats:
+        top_city = sorted(stats.get("kota", {}).items(), key=lambda x: -x[1])[:4]
+        if top_city:
+            lines.append("Sebaran kota terbesar: " +
+                         ", ".join(f"{k} {v}" for k, v in top_city) + " material.")
+        top_cat = sorted(stats.get("kategori", {}).items(), key=lambda x: -x[1])[:4]
+        if top_cat:
+            lines.append("Kategori terbanyak: " +
+                         ", ".join(f"{k} {v}" for k, v in top_cat) + ".")
+    if cards:
+        lines.append("")
+        lines.append("Contoh yang tersedia:")
+        for i, m in enumerate(cards[:4], 1):
+            lines.append(_material_item_line(i, m))
+        lines.append("")
+        lines.append('Ketik "tampilkan katalog" untuk melihat daftar lengkap, '
+                     "atau sebut kategori/kota untuk mempersempit.")
+    return "\n".join(lines)
+
+
+def pilih_material_text(cards: list[dict]) -> str:
+    if not cards:
+        return "Sebutkan nama atau kategori material yang kamu maksud, ya."
+    lines = ["Material yang mana? Ini pilihan terakhir:"]
+    for i, m in enumerate(cards, 1):
+        lines.append(_material_item_line(i, m))
+    return "\n".join(lines)
+
+
+def material_detail_text(m: dict) -> str:
+    satuan = m.get("satuan") or "unit"
+    lines = [
+        f"Detail material: {m['nama_material']}",
+        f"- Kategori: {m.get('kategori') or '-'}",
+        f"- Harga: {fmt_rp(m['harga'])}/{satuan}",
+        f"- Stok tersedia: {fmt_num(m['stok'])} {satuan}",
+        f"- Lokasi: {m.get('kota') or '-'}"
+        + (f", {m['provinsi']}" if m.get("provinsi") else "")
+        + (f" ({m['lokasi']})" if m.get("lokasi") else ""),
+    ]
+    if m.get("deskripsi_material"):
+        lines.append(f"- Deskripsi: {m['deskripsi_material']}")
+    if m.get("id_seller"):
+        lines.append(f"- ID penjual: {m['id_seller']}")
+    lines.append("")
+    lines.append(f'Mau pesan? Ketik "pesan 1 {satuan}" atau tekan tombol Pesan pada kartu. '
+                 "Jumlah dan ongkir bisa dikonfirmasi sebelum checkout.")
+    return "\n".join(lines)
+
+
+def material_order_text(m: dict, qty: float, total: float) -> str:
+    satuan = m.get("satuan") or "unit"
+    lines = [
+        f"Baik, aku siapkan pesanan untuk {m['nama_material']}.",
+        f"- Jumlah: {fmt_num(qty)} {satuan}",
+        f"- Harga: {fmt_rp(m['harga'])}/{satuan}",
+        f"- Total estimasi: {fmt_rp(total)}",
+        f"- Penjual: {m.get('kota') or '-'} (ID {m.get('id_seller') or '-'})",
+        "",
+        "Total belum termasuk ongkir. Tekan tombol Pesan pada kartu untuk mengisi alamat "
+        "dan metode pengiriman, lalu konfirmasi.",
+    ]
+    if qty >= float(m.get("stok") or 0):
+        lines.append("Catatan: jumlah ini mengambil seluruh stok yang tersedia.")
+    return "\n".join(lines)
+
+
+def material_budget_text(m: dict) -> str:
+    satuan = m.get("satuan") or "unit"
+    return (f"Untuk {m['nama_material']} ({fmt_rp(m['harga'])}/{satuan}), "
+            'sebutkan anggaranmu, misalnya "budget 500rb", biar aku hitung jumlah yang bisa dibeli.')
+
+
+def material_hitung_text(m: dict, budget: float, affordable: int,
+                         qty: int, total: float) -> str:
+    satuan = m.get("satuan") or "unit"
+    lines = [f"Dengan anggaran {fmt_rp(budget)}:"]
+    if affordable <= 0:
+        lines.append(f"- Harga {m['nama_material']} {fmt_rp(m['harga'])}/{satuan}, "
+                     "jadi anggaran ini belum cukup untuk 1 unit.")
+        lines.append("Coba naikkan anggaran atau pilih material yang lebih murah.")
+        return "\n".join(lines)
+    lines.append(f"- Secara anggaran bisa membeli sekitar {affordable} {satuan}.")
+    if qty < affordable:
+        lines.append(f"- Namun stok yang tersedia hanya {fmt_num(m['stok'])} {satuan}, "
+                     f"jadi maksimal {qty} {satuan}.")
+    lines.append(f"- Total untuk {qty} {satuan}: {fmt_rp(total)}.")
+    lines.append(f"- Lokasi: {m.get('kota') or '-'}.")
+    lines.append("")
+    lines.append(f'Ketik "pesan {qty} {satuan}" kalau mau lanjut, atau tekan tombol Pesan pada kartu.')
+    return "\n".join(lines)

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300" role="img" aria-label="Ilustrasi kategori Kaca">
+<rect width="400" height="300" fill="#ECFEFF"/>
+<circle cx="330" cy="52" r="86" fill="#0891B2" opacity="0.10"/>
+<circle cx="66" cy="252" r="72" fill="#0891B2" opacity="0.08"/>
+<path d="M178 88h54v22l16 28v26c26 18 32 42 22 66-12 28-44 42-76 34-34-8-52-38-44-68 6-22 22-34 28-42v-44z" fill="#0891B2"/><path d="M170 206h72" stroke="#ECFEFF" stroke-width="9" stroke-linecap="round"/>
+<text x="200" y="278" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#0891B2">Kaca</text>
+</svg>

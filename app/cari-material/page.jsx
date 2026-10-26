@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import Navbar from "@/components/Navbar";
+import MaterialImage from "@/components/MaterialImage";
+import OrderModal from "@/components/OrderModal";
 
 const AI_GREETING =
   "Halo! Aku **CIRCLO AI**, asisten usaha dari material daur ulang. Ceritakan kebutuhan materialmu (misalnya produk yang ingin dibuat), lalu sebutkan **kota** dan perkiraan **modal** agar rekomendasinya pas.";
@@ -13,6 +15,8 @@ const rupiah = new Intl.NumberFormat("id-ID", {
   currency: "IDR",
   maximumFractionDigits: 0,
 });
+
+const angka = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 2 });
 
 const MD_COMPONENTS = {
   p: ({ node, ...props }) => <p className="mb-3 last:mb-0 leading-relaxed" {...props} />,
@@ -27,30 +31,69 @@ const MD_COMPONENTS = {
   a: ({ node, ...props }) => <a className="text-[#3f6a0b] underline" {...props} />,
 };
 
-function MaterialCard({ m }) {
+function MaterialCard({ m, onOrder }) {
+  const stock = Number(m.stok || 0);
+  const isIllustration = m.image_match_type === "category_fallback";
+
   return (
-    <Link
-      href={`/katalog/${m.id_material}`}
-      className="block bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm hover:shadow-md hover:border-[#3f6a0b] transition-all"
-    >
-      <div className="relative h-24 bg-[#e5f0f8] flex items-center justify-center">
-        <svg className="w-8 h-8 text-[#4d7c0f]" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-        </svg>
-        <span className="absolute top-2 right-2 bg-[#d9f99d] text-[#3f6212] text-[10px] font-bold px-2 py-0.5 rounded-full">
-          {m.kategori}
-        </span>
-      </div>
-      <div className="p-3">
-        <h4 className="font-bold text-gray-800 text-sm leading-snug line-clamp-2">{m.nama_material}</h4>
-        <p className="text-xs text-gray-500 mt-1">{m.kota}</p>
+    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm hover:shadow-md hover:border-[#3f6a0b] transition-all flex flex-col">
+      <Link href={`/katalog/${m.id_material}`} className="block">
+        <div className="relative h-24">
+          <MaterialImage
+            materialId={m.id_material}
+            materialName={m.nama_material}
+            category={m.kategori}
+            imageUrl={m.image_url}
+            imageAlt={m.image_alt}
+            className="h-full w-full"
+          />
+          <span className="absolute top-2 right-2 bg-[#d9f99d] text-[#3f6212] text-xs font-bold px-2 py-1 rounded-full">
+            {m.kategori}
+          </span>
+          {isIllustration && (
+            <span className="absolute bottom-2 left-2 bg-white/90 text-gray-600 text-[10px] font-medium px-2 py-0.5 rounded">
+              Ilustrasi kategori
+            </span>
+          )}
+        </div>
+      </Link>
+
+      <div className="p-3 flex flex-col flex-grow">
+        <Link href={`/katalog/${m.id_material}`} className="block">
+          <h4 className="font-bold text-gray-800 text-sm leading-snug line-clamp-2 hover:text-[#3f6a0b]">
+            {m.nama_material}
+          </h4>
+        </Link>
+        <p className="text-xs text-gray-500 mt-1">
+          {m.kota}
+          {m.provinsi ? `, ${m.provinsi}` : ""}
+        </p>
         <p className="text-sm font-semibold text-gray-800 mt-1">
           {rupiah.format(Number(m.harga))}
           <span className="text-xs font-normal text-gray-500">/{m.satuan}</span>
         </p>
-        <span className="text-[11px] text-[#4d7c0f] font-medium mt-2 inline-block">Lihat detail &rarr;</span>
+        <p className={`text-[11px] mt-1 ${stock > 0 ? "text-gray-500" : "text-red-600"}`}>
+          Stok {angka.format(stock)} {m.satuan}
+        </p>
+
+        <div className="mt-auto pt-3 flex items-center gap-2">
+          <Link
+            href={`/katalog/${m.id_material}`}
+            className="flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-center text-[11px] font-semibold text-gray-700 hover:bg-gray-50"
+          >
+            Detail
+          </Link>
+          <button
+            type="button"
+            onClick={() => onOrder?.(m)}
+            disabled={stock <= 0}
+            className="flex-1 rounded-md bg-[#3f6a0b] px-2 py-1.5 text-[11px] font-semibold text-white hover:bg-[#345609] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Pesan
+          </button>
+        </div>
       </div>
-    </Link>
+    </div>
   );
 }
 
@@ -62,6 +105,8 @@ export default function CariMaterialPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showBanner, setShowBanner] = useState(true);
+  const [orderMaterial, setOrderMaterial] = useState(null);
+  const [orderNotice, setOrderNotice] = useState(null);
   const sessionIdRef = useRef(null);
   const scrollRef = useRef(null);
 
@@ -201,6 +246,15 @@ export default function CariMaterialPage() {
         </div>
       )}
 
+      {orderNotice && (
+        <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 flex flex-wrap items-center justify-between gap-2">
+          <span>{orderNotice}</span>
+          <Link href="/orders" className="font-semibold underline">
+            Lihat pesanan
+          </Link>
+        </div>
+      )}
+
       {/* Area Chat / Hasil Pencarian */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col h-[700px]">
 
@@ -245,7 +299,7 @@ export default function CariMaterialPage() {
                     {msg.materials?.length > 0 && (
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mt-4">
                         {msg.materials.map((m) => (
-                          <MaterialCard key={m.id_material} m={m} />
+                          <MaterialCard key={m.id_material} m={m} onOrder={setOrderMaterial} />
                         ))}
                       </div>
                     )}
@@ -325,6 +379,20 @@ export default function CariMaterialPage() {
         </div>
 
       </div>
+
+      {orderMaterial && (
+        <OrderModal
+          material={orderMaterial}
+          onClose={() => setOrderMaterial(null)}
+          onSuccess={(data) => {
+            setOrderNotice(
+              `Pesanan #${data.id_pesanan} berhasil dibuat. Total estimasi ${rupiah.format(
+                Number(data.total_estimasi || 0),
+              )}, belum termasuk ongkir.`,
+            );
+          }}
+        />
+      )}
     </div>
     </>
   );

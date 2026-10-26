@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import MaterialImage from "@/components/MaterialImage";
+import MaterialOrderPanel from "@/components/MaterialOrderPanel";
 
 const AI_URL = process.env.CIRCLO_AI_URL || "http://127.0.0.1:8000";
 
@@ -38,14 +40,21 @@ export default async function MaterialDetailPage({ params }) {
       </Link>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden grid grid-cols-1 md:grid-cols-2">
-        <div className="relative bg-[#e5f0f8] flex items-center justify-center min-h-[260px]">
-          <svg className="w-20 h-20 text-[#4d7c0f]" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-          </svg>
-          <span className="absolute top-3 right-3 bg-[#d9f99d] text-[#3f6212] text-xs font-bold px-3 py-1 rounded-full">
-            {m.kategori}
-          </span>
-        </div>
+      <div className="relative min-h-[260px]">
+        <MaterialImage
+          materialId={m.id_material}
+          materialName={m.nama_material}
+          category={m.kategori}
+          imageUrl={m.image_url}
+          imageAlt={m.image_alt}
+          className="h-full min-h-[260px] w-full"
+        />
+
+        <span className="absolute top-3 right-3 bg-[#d9f99d] text-[#3f6212] text-xs font-bold px-3 py-1 rounded-full">
+          {m.kategori}
+        </span>
+      </div>
+
 
         <div className="p-6 sm:p-8 flex flex-col">
           <h1 className="text-2xl font-bold text-gray-800 mb-2">{m.nama_material}</h1>
@@ -76,7 +85,9 @@ export default async function MaterialDetailPage({ params }) {
             </div>
           )}
 
-          <div className="mt-auto">
+          <MaterialOrderPanel material={m} />
+
+          <div className="mt-6">
             <p className="text-xs text-gray-400">
               Info material berasal dari katalog CIRCLO. Verifikasi harga dan stok sebelum transaksi.
             </p>

@@ -20,7 +20,7 @@ KOTA_PROVINSI = {
     "Jakarta": "DKI Jakarta", "Bandung": "Jawa Barat", "Bogor": "Jawa Barat",
     "Depok": "Jawa Barat", "Bekasi": "Jawa Barat", "Tangerang": "Banten",
     "Semarang": "Jawa Tengah", "Solo": "Jawa Tengah", "Yogyakarta": "DI Yogyakarta",
-    "Denpasar": "Bali", "Medan": "Sumatera Utara", "Makassar": "Sulawesi Selatan",
+    "Denpasar": "Bali", "Bali": "Bali", "Medan": "Sumatera Utara", "Makassar": "Sulawesi Selatan",
 }
 
 ALIAS = {"sby": "Surabaya", "sda": "Sidoarjo", "jogja": "Yogyakarta",

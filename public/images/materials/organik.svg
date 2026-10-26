@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300" role="img" aria-label="Ilustrasi kategori Organik">
+<rect width="400" height="300" fill="#F0FDF4"/>
+<circle cx="330" cy="52" r="86" fill="#3F7A1E" opacity="0.10"/>
+<circle cx="66" cy="252" r="72" fill="#3F7A1E" opacity="0.08"/>
+<path d="M208 250c-4-54 18-98 70-130 8 60-12 112-58 134z" fill="#3F7A1E"/><path d="M203 252c-20-48-8-90 36-122" stroke="#3F7A1E" stroke-width="10" stroke-linecap="round"/><path d="M142 180c22-38 58-46 88-36-16 34-46 54-88 36z" fill="#6BBF3A"/>
+<text x="200" y="278" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#3F7A1E">Organik</text>
+</svg>

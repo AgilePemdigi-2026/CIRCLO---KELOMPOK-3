@@ -1,6 +1,7 @@
 """Buat catalog_snapshot.json dari step2_seed_data.sql (tanpa perlu koneksi Supabase).
 
-    python dataset/seed_to_snapshot.py step2_seed_data.sql dataset/catalog_snapshot.json
+    python dataset/seed_to_snapshot.py step2_seed_data.sql seed_tambahan.sql dataset/catalog_snapshot.json
+(argumen terakhir = berkas keluaran; boleh satu atau beberapa berkas SQL sebelumnya)
 Kalau data di database sudah kamu ubah, pakai dump_catalog.py supaya snapshot sesuai database.
 """
 import json
@@ -61,27 +62,36 @@ def _lit(t: str):
     return float(t) if "." in t else int(t)
 
 
-def main(sql_path, out_path):
-    sql = open(sql_path, encoding="utf-8").read()
-    m = re.search(r"FROM \(VALUES(.*?)\) AS v\(", sql, re.S)
-    mats = []
-    for i, r in enumerate(_tuples(m.group(1)), 1):
-        _, nama, kat, stok, harga, lokasi, desk, kota, prov, sat = r
-        mats.append({"id_material": i, "id_seller": 1, "nama_material": nama, "kategori": kat,
-                     "stok": float(stok), "harga": float(harga), "kota": kota, "provinsi": prov,
-                     "satuan": sat, "deskripsi_material": desk})
-    m = re.search(r"catatan_k3\)\s*VALUES(.*?)ON CONFLICT \(nama_produk\)", sql, re.S)
-    resep = []
-    for i, r in enumerate(_tuples(m.group(1)), 1):
-        nama, kat, kw, bpu, sat, susut, modal, langkah, k3 = r
-        resep.append({"id_resep": i, "nama_produk": nama, "kategori_material": kat,
-                      "kata_kunci_material": kw, "bahan_per_unit": float(bpu), "satuan": sat,
-                      "persen_susut": float(susut), "estimasi_modal": float(modal),
-                      "langkah_singkat": langkah, "catatan_k3": k3})
+def parse_sql_files(paths):
+    """Gabungkan material & resep dari satu atau beberapa berkas seed (urutan = urutan id)."""
+    mats, resep = [], []
+    for sql_path in paths:
+        sql = open(sql_path, encoding="utf-8").read()
+        m = re.search(r"FROM \(VALUES(.*?)\) AS v\(", sql, re.S)
+        for r in (_tuples(m.group(1)) if m else []):
+            _, nama, kat, stok, harga, lokasi, desk, kota, prov, sat = r
+            mats.append({"id_material": len(mats) + 1, "id_seller": 1, "nama_material": nama,
+                         "kategori": kat, "stok": float(stok), "harga": float(harga), "kota": kota,
+                         "provinsi": prov, "satuan": sat, "deskripsi_material": desk, "_sumber": sql_path})
+        m = re.search(r"catatan_k3\)\s*VALUES(.*?)ON CONFLICT \(nama_produk\)", sql, re.S)
+        for r in (_tuples(m.group(1)) if m else []):
+            nama, kat, kw, bpu, sat, susut, modal, langkah, k3 = r
+            resep.append({"id_resep": len(resep) + 1, "nama_produk": nama, "kategori_material": kat,
+                          "kata_kunci_material": kw, "bahan_per_unit": float(bpu), "satuan": sat,
+                          "persen_susut": float(susut), "estimasi_modal": float(modal),
+                          "langkah_singkat": langkah, "catatan_k3": k3, "_sumber": sql_path})
+    return mats, resep
+
+
+def main(args):
+    *sql_paths, out_path = args
+    mats, resep = parse_sql_files(sql_paths)
+    for r in mats + resep:
+        r.pop("_sumber", None)
     json.dump({"materials": mats, "resep": resep}, open(out_path, "w", encoding="utf-8"),
               ensure_ascii=False, indent=1)
     print(f"{len(mats)} material, {len(resep)} resep -> {out_path}")
 
 
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2])
+    main(sys.argv[1:])

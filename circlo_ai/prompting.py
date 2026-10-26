@@ -15,7 +15,9 @@ SYSTEM_PROMPT = (
 )
 
 TASKS = ["tanya_slot", "rekomendasi", "rekomendasi_kosong", "cara", "tanya_jumlah",
-         "tanya_produk", "hitung", "modal", "mulai", "bebas"]
+         "tanya_produk", "hitung", "modal", "mulai", "bebas",
+         "katalog", "katalog_jumlah", "katalog_kosong", "detail_material",
+         "pesan", "hitung_material", "tanya_material", "tanya_budget"]
 
 
 def _num(o):

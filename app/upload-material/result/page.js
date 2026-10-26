@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { BrainCircuit, CircleAlert, CircleCheck, LoaderCircle, Network, Pencil, Recycle, Ruler, Shapes, ThumbsUp } from 'lucide-react';
@@ -30,6 +30,7 @@ function ClassificationResult() {
   const [ready, setReady] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const savingRef = useRef(false);
 
   useEffect(() => {
     setData(loadResult());
@@ -55,25 +56,35 @@ function ClassificationResult() {
   const isEdit = Boolean(editId);
 
   async function onConfirm() {
+    if (savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
     setSaveError('');
+    if (!form || !photo?.dataUrl) {
+      setSaveError('Upload failed. Please check the data');
+      savingRef.current = false;
+      setSaving(false);
+      return;
+    }
     const material = {
       nama: n.nama,
       jenis_material: n.jenis,
-      kategori: n.kategori,
+      kategori: n.jenis,
+      kategori_ai: n.kategori,
       kondisi: n.kondisi,
       kondisi_seller: form.condition.trim(),
       dimensi: n.dimensi,
       skor_ai: n.skor,
-      satuan: form.satuan,
+      satuan: form.satuan || 'kg',
       deskripsi: form.description.trim(),
       jumlah: Number(form.quantity),
       harga: Number(form.price),
       lokasi: form.location.trim(),
+      upload_token: data.uploadToken,
     };
     try {
-      if (isEdit) await updateMaterial(editId, { ...material, foto: photo?.remote ? undefined : photo?.dataUrl });
-      else await saveMaterial({ ...material, foto: photo?.dataUrl });
+      if (isEdit) await updateMaterial(editId, { ...material, foto: photo.remote ? undefined : photo.dataUrl });
+      else await saveMaterial({ ...material, foto: photo.dataUrl });
 
       clearDraft();
       clearResult();
@@ -86,6 +97,7 @@ function ClassificationResult() {
       router.push(isEdit ? '/my-materials' : '/marketplace');
     } catch (err) {
       setSaveError(err.message || 'Material gagal disimpan. Coba lagi.');
+      savingRef.current = false;
       setSaving(false);
     }
   }
@@ -100,7 +112,7 @@ function ClassificationResult() {
           </span>
           <div>
             <h1 className="font-display text-[24px] font-bold text-circlo-green">
-              AI Material Classification<span className="sr-only">: {jenisInEnglish(n.jenis)}</span>
+              AI Material Classification: {jenisInEnglish(n.jenis)}
             </h1>
             <p className="mt-1.5 text-[16px] leading-[1.6] text-circlo-muted">
               Deskripsi material telah diproses menggunakan NLP untuk mengenali jenis dan atribut material. Tinjau hasil
@@ -142,8 +154,10 @@ function ClassificationResult() {
                 <Pencil className="h-4 w-4" /> Edit
               </Link>
               <button
+                type="button"
                 onClick={onConfirm}
                 disabled={saving}
+                aria-busy={saving}
                 className="flex h-[58px] items-center justify-center gap-2 rounded-lg bg-circlo-green text-[15px] font-medium text-white transition hover:brightness-110 disabled:opacity-60"
               >
                 {saving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <CircleCheck className="h-4 w-4" />}

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300" role="img" aria-label="Ilustrasi kategori Lainnya">
+<rect width="400" height="300" fill="#F9FAFB"/>
+<circle cx="330" cy="52" r="86" fill="#6B7280" opacity="0.10"/>
+<circle cx="66" cy="252" r="72" fill="#6B7280" opacity="0.08"/>
+<path d="M130 128l75-38 75 38v100l-75 38-75-38z" fill="#6B7280"/><path d="M130 128l75 38 75-38M205 166v100" stroke="#F9FAFB" stroke-width="8" stroke-linejoin="round"/>
+<text x="200" y="278" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#6B7280">Lainnya</text>
+</svg>

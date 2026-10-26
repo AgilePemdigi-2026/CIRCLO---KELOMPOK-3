@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300" role="img" aria-label="Ilustrasi kategori Plastik">
+<rect width="400" height="300" fill="#EAF4FF"/>
+<circle cx="330" cy="52" r="86" fill="#2563A8" opacity="0.10"/>
+<circle cx="66" cy="252" r="72" fill="#2563A8" opacity="0.08"/>
+<path d="M175 92h50v24l22 34v98a16 16 0 0 1-16 16h-62a16 16 0 0 1-16-16v-98l22-34z" fill="#2563A8"/><rect x="185" y="108" width="30" height="10" rx="4" fill="#EAF4FF"/><path d="M160 180h80" stroke="#EAF4FF" stroke-width="8"/>
+<text x="200" y="278" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#2563A8">Plastik</text>
+</svg>

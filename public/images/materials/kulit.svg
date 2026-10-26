@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300" role="img" aria-label="Ilustrasi kategori Kulit">
+<rect width="400" height="300" fill="#FEF3C7"/>
+<circle cx="330" cy="52" r="86" fill="#A16207" opacity="0.10"/>
+<circle cx="66" cy="252" r="72" fill="#A16207" opacity="0.08"/>
+<path d="M150 112c34-20 82-18 112 4 26 20 24 58 4 88-18 28-52 46-86 38-32-8-50-38-46-70 3-24 8-46 16-60z" fill="#A16207"/><path d="M168 142c20-8 44-4 60 10M164 188c26 10 56 8 78-6" stroke="#FEF3C7" stroke-width="8" stroke-linecap="round"/>
+<text x="200" y="278" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#A16207">Kulit</text>
+</svg>

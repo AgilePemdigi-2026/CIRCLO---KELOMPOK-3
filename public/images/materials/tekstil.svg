@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300" role="img" aria-label="Ilustrasi kategori Tekstil">
+<rect width="400" height="300" fill="#E6FFFB"/>
+<circle cx="330" cy="52" r="86" fill="#0F766E" opacity="0.10"/>
+<circle cx="66" cy="252" r="72" fill="#0F766E" opacity="0.08"/>
+<path d="M145 105c45-24 100-10 120 20-30 16-44 52-38 88-40 18-92 8-116-18 26-28 32-62 34-90z" fill="#0F766E"/><path d="M155 120c30 12 56 34 70 62M175 110c22 20 42 44 50 72" stroke="#E6FFFB" stroke-width="7" stroke-linecap="round"/>
+<text x="200" y="278" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#0F766E">Tekstil</text>
+</svg>

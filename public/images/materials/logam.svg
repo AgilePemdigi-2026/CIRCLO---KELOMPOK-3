@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300" role="img" aria-label="Ilustrasi kategori Logam">
+<rect width="400" height="300" fill="#F1F5F9"/>
+<circle cx="330" cy="52" r="86" fill="#4B5563" opacity="0.10"/>
+<circle cx="66" cy="252" r="72" fill="#4B5563" opacity="0.08"/>
+<circle cx="205" cy="178" r="66" fill="#4B5563"/><circle cx="205" cy="178" r="26" fill="#F1F5F9"/><path d="M205 96v28M205 232v28M123 178h28M259 178h28M147 120l20 20M243 216l20 20M263 120l-20 20M167 216l-20 20" stroke="#4B5563" stroke-width="14" stroke-linecap="round"/>
+<text x="200" y="278" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#4B5563">Logam</text>
+</svg>
