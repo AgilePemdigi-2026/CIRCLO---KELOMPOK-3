@@ -3,7 +3,7 @@ import '@fontsource-variable/montserrat';
 import './globals.css';
 
 export const metadata = {
-  title: 'CIRCLO | Upload Material',
+  title: 'CIRCLO',
   description: 'Platform e-government pengelolaan material sirkular berbasis AI',
 };
 

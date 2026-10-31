@@ -1,112 +1,490 @@
-'use client';
 
-import { useState } from 'react';
-import { Check, ChevronLeft, ChevronRight } from 'lucide-react';
-import JumlahPesananStep from './JumlahPesananStep';
-import AlamatPengirimanStep from './AlamatPengirimanStep';
-import PembayaranStep from './PembayaranStep';
+"use client";
 
-const steps = ['Jumlah Pesanan', 'Alamat', 'Pembayaran'];
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { getAccessToken } from "@/lib/auth";
+import JumlahPesananStep from "./JumlahPesananStep";
+import AlamatPengirimanStep from "./AlamatPengirimanStep";
+import PembayaranStep from "./PembayaranStep";
+
+const steps = ["Jumlah Pesanan", "Alamat", "Pembayaran"];
+
+const rupiah = (value) =>
+  new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    maximumFractionDigits: 0,
+  }).format(Number(value) || 0);
 
 export default function CheckoutFlow() {
+  const router = useRouter();
+
   const [step, setStep] = useState(0);
+  const [material, setMaterial] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
   const [data, setData] = useState({
     jumlah: 1,
-    metodeKirim: 'Dikirim',
-    alamat: '',
-    metodePembayaran: 'Transfer Bank',
+    metodeKirim: "Dikirim",
+    namaPenerima: "",
+    nomorHp: "",
+    alamat: "",
+    kota: "",
+    provinsi: "",
+    kodePos: "",
+    metodePembayaran: "Virtual Account",
+bank: "BCA",
   });
 
-  const update = (patch) => setData((prev) => ({ ...prev, ...patch }));
-  const next = () => setStep((current) => Math.min(current + 1, steps.length - 1));
-  const back = () => setStep((current) => Math.max(current - 1, 0));
+  // Mengambil informasi awal material dari URL.
+  // Harga dan stok tetap diverifikasi server saat checkout.
+  useEffect(() => {
+    const params = new URLSearchParams(
+      window.location.search
+    );
+
+    const id = Number(params.get("id"));
+    const harga = Number(params.get("harga"));
+    const stok = Number(params.get("stok"));
+
+    if (
+      !Number.isInteger(id) ||
+      id <= 0 ||
+      !Number.isFinite(harga) ||
+      harga < 0 ||
+      !Number.isFinite(stok) ||
+      stok <= 0
+    ) {
+      return;
+    }
+
+    setMaterial({
+      id_material: id,
+      nama_material: params.get("nama") || "Material",
+      harga,
+      stok,
+      satuan: params.get("satuan") || "unit",
+    });
+  }, []);
+
+  const update = (patch) => {
+    setData((prev) => ({
+      ...prev,
+      ...patch,
+    }));
+    setError("");
+  };
+
+  const jumlah = Number(data.jumlah);
+
+  const subtotal =
+    material && Number.isFinite(jumlah)
+      ? jumlah * material.harga
+      : 0;
+
+  // Validasi jumlah pesanan
+  const validasiJumlah = () => {
+    if (!material) {
+      return "Pilih material terlebih dahulu.";
+    }
+
+    if (
+      !Number.isInteger(jumlah) ||
+      jumlah <= 0
+    ) {
+      return "Jumlah pesanan harus berupa bilangan bulat lebih dari 0.";
+    }
+
+    if (jumlah > material.stok) {
+      return `Stok hanya tersedia ${material.stok} ${material.satuan}.`;
+    }
+
+    if (
+      !["Dikirim", "Ambil di tempat"].includes(
+        data.metodeKirim
+      )
+    ) {
+      return "Pilih metode pengiriman yang valid.";
+    }
+
+    return "";
+  };
+
+  // Validasi seluruh form alamat
+  const validasiAlamat = () => {
+    if (data.metodeKirim === "Ambil di tempat") {
+      return "";
+    }
+
+    if (!data.namaPenerima.trim()) {
+      return "Nama penerima wajib diisi.";
+    }
+
+    if (!/^08\d{8,11}$/.test(data.nomorHp.trim())) {
+      return "Nomor HP harus diawali 08 dan berisi 10–13 digit.";
+    }
+
+    if (!data.alamat.trim()) {
+      return "Alamat lengkap wajib diisi.";
+    }
+
+    if (!data.kota.trim()) {
+      return "Kota/Kabupaten wajib diisi.";
+    }
+
+    if (!data.provinsi.trim()) {
+      return "Provinsi wajib diisi.";
+    }
+
+    if (!/^\d{5}$/.test(data.kodePos.trim())) {
+      return "Kode pos harus terdiri dari 5 angka.";
+    }
+
+    return "";
+  };
+
+  // Menggabungkan alamat untuk API pesanan saat ini
+  const alamatLengkap = () => {
+    if (data.metodeKirim === "Ambil di tempat") {
+      return "";
+    }
+
+    return [
+      `Penerima: ${data.namaPenerima.trim()}`,
+      `No. HP: ${data.nomorHp.trim()}`,
+      data.alamat.trim(),
+      data.kota.trim(),
+      data.provinsi.trim(),
+      data.kodePos.trim(),
+    ].join(", ");
+  };
+
+  const lanjut = () => {
+    setError("");
+
+    if (step === 0) {
+      const pesan = validasiJumlah();
+
+      if (pesan) {
+        setError(pesan);
+        return;
+      }
+    }
+
+    if (step === 1) {
+      const pesan = validasiAlamat();
+
+      if (pesan) {
+        setError(pesan);
+        return;
+      }
+    }
+
+    setStep((prev) => Math.min(prev + 1, 2));
+  };
+
+  const kembali = () => {
+    setError("");
+    setStep((prev) => Math.max(prev - 1, 0));
+  };
+
+  // Membuat pesanan melalui API
+  const buatPesanan = async () => {
+    if (loading) return;
+
+    const errorJumlah = validasiJumlah();
+    const errorAlamat = validasiAlamat();
+
+    if (errorJumlah || errorAlamat) {
+      setError(errorJumlah || errorAlamat);
+      return;
+    }
+
+    if (!data.metodePembayaran) {
+      setError("Pilih metode pembayaran.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const token = await getAccessToken();
+
+      if (!token) {
+        throw new Error(
+          "Silakan login menggunakan akun Buyer."
+        );
+      }
+
+      const response = await fetch("/api/orders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          id_material: material.id_material,
+          kuantitas: jumlah,
+          metode_kirim: data.metodeKirim,
+          alamat: alamatLengkap(),
+        }),
+      });
+
+      const result = await response
+        .json()
+        .catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(
+          result.error || "Gagal membuat pesanan."
+        );
+      }
+
+      if (!result.id_pesanan) {
+        throw new Error(
+          "ID pesanan tidak ditemukan."
+        );
+      }
+
+      // Langsung menuju halaman Pesanan Saya
+      router.push("/orders");
+      router.refresh();
+    } catch (err) {
+      setError(
+        err.message ||
+          "Terjadi kesalahan saat membuat pesanan."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[2fr_1fr]">
+    <div className="mt-8 grid gap-6 lg:grid-cols-[2fr_1fr]">
+      {/* BAGIAN KIRI: CHECKOUT */}
       <section className="rounded-2xl bg-white p-6 shadow-card sm:p-8">
-        <ol className="mb-8 flex flex-wrap items-center gap-3">
-          {steps.map((label, index) => {
-            const active = index === step;
-            const done = index < step;
-            return (
-              <li key={label} className="flex items-center gap-2">
-                <span
-                  className={`flex h-7 w-7 items-center justify-center rounded-full text-[12px] font-semibold ${
-                    active
-                      ? 'bg-circlo-green text-white'
-                      : done
-                        ? 'bg-circlo-soft text-circlo-green'
-                        : 'bg-circlo-field text-circlo-muted'
-                  }`}
-                >
-                  {done ? <Check className="h-4 w-4" /> : index + 1}
-                </span>
-                <span className={`text-[13px] font-medium ${active ? 'text-circlo-ink' : 'text-circlo-muted'}`}>
-                  {label}
-                </span>
-                {index < steps.length - 1 && <span className="mx-1 hidden h-px w-8 bg-circlo-line sm:block" />}
-              </li>
-            );
-          })}
-        </ol>
 
-        {step === 0 && <JumlahPesananStep data={data} onChange={update} />}
-        {step === 1 && <AlamatPengirimanStep data={data} onChange={update} />}
-        {step === 2 && <PembayaranStep data={data} onChange={update} />}
+        {/* Indikator langkah */}
+        <div className="mb-8 flex flex-wrap gap-3">
+          {steps.map((nama, index) => (
+            <div
+              key={nama}
+              className={`rounded-full px-4 py-2 text-sm ${
+                step === index
+                  ? "bg-circlo-green text-white"
+                  : index < step
+                  ? "bg-green-100 text-green-800"
+                  : "bg-circlo-field text-circlo-muted"
+              }`}
+            >
+              {index + 1}. {nama}
+            </div>
+          ))}
+        </div>
 
-        <div className="mt-8 flex items-center justify-between gap-3 border-t border-circlo-line pt-6">
+        {!material && (
+          <p className="mb-5 rounded-lg bg-amber-50 p-4 text-sm text-amber-800">
+            Belum ada material dipilih.
+            Silakan pilih material dari Material Catalog.
+          </p>
+        )}
+
+        {/* STEP 1: JUMLAH */}
+        {step === 0 && (
+          <JumlahPesananStep
+            data={data}
+            onChange={update}
+            material={material}
+          />
+        )}
+
+        {/* STEP 2: ALAMAT */}
+        {step === 1 && (
+          <AlamatPengirimanStep
+            data={data}
+            onChange={update}
+          />
+        )}
+
+        {/* STEP 3: PEMBAYARAN */}
+        {step === 2 && (
+          <>
+            <PembayaranStep
+              data={data}
+              onChange={update}
+            />
+
+            <div className="mt-6 rounded-xl border border-green-200 bg-green-50 p-5">
+              <h3 className="font-semibold text-green-900">
+                Konfirmasi Pesanan
+              </h3>
+
+              <div className="mt-3 space-y-2 text-sm text-green-900">
+                <p>
+                  <strong>Material:</strong>{" "}
+                  {material?.nama_material || "-"}
+                </p>
+
+                <p>
+                  <strong>Jumlah:</strong>{" "}
+                  {jumlah} {material?.satuan || "unit"}
+                </p>
+
+                <p>
+                  <strong>Pengiriman:</strong>{" "}
+                  {data.metodeKirim}
+                </p>
+
+                {data.metodeKirim === "Dikirim" && (
+                  <>
+                    <p>
+                      <strong>Penerima:</strong>{" "}
+                      {data.namaPenerima}
+                    </p>
+
+                    <p>
+                      <strong>No. HP:</strong>{" "}
+                      {data.nomorHp}
+                    </p>
+
+                    <p>
+                      <strong>Alamat:</strong>{" "}
+                      {[
+                        data.alamat,
+                        data.kota,
+                        data.provinsi,
+                        data.kodePos,
+                      ]
+                        .filter(Boolean)
+                        .join(", ")}
+                    </p>
+                  </>
+                )}
+
+                <p>
+                  <strong>Metode Pembayaran:</strong>{" "}
+                  {data.metodePembayaran}
+                </p>
+
+                <p className="font-bold">
+                  Subtotal: {rupiah(subtotal)}
+                </p>
+              </div>
+            </div>
+
+            <p className="mt-4 rounded-lg bg-amber-50 p-4 text-sm text-amber-800">
+              Pembayaran online belum aktif.
+              Tombol Buat Pesanan hanya membuat pesanan
+              dengan status Menunggu Konfirmasi,
+              bukan menyelesaikan pembayaran.
+            </p>
+          </>
+        )}
+
+        {/* PESAN ERROR */}
+        {error && (
+          <p
+            role="alert"
+            className="mt-5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+          >
+            {error}
+          </p>
+        )}
+
+        {/* TOMBOL NAVIGASI */}
+        <div className="mt-8 flex items-center justify-between gap-3 border-t pt-6">
           <button
             type="button"
-            onClick={back}
-            disabled={step === 0}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-circlo-fieldline px-5 py-2.5 text-[14px] font-medium text-circlo-ink hover:bg-circlo-bg disabled:cursor-not-allowed disabled:opacity-40"
+            onClick={kembali}
+            disabled={step === 0 || loading}
+            className="rounded-lg border border-gray-300 px-5 py-3 font-medium text-gray-700 disabled:opacity-40"
           >
-            <ChevronLeft className="h-4 w-4" /> Kembali
+            Kembali
           </button>
 
-          {step < steps.length - 1 ? (
+          {step < 2 ? (
             <button
               type="button"
-              onClick={next}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-circlo-green px-6 py-2.5 text-[14px] font-medium text-white hover:brightness-110"
+              onClick={lanjut}
+              disabled={!material}
+              className="rounded-lg bg-circlo-green px-6 py-3 font-semibold text-white disabled:opacity-50"
             >
-              Lanjut <ChevronRight className="h-4 w-4" />
+              Lanjut
             </button>
           ) : (
             <button
               type="button"
-              disabled
-              title="Hubungkan tombol ini ke /api/orders untuk membuat pesanan."
-              className="inline-flex items-center gap-1.5 rounded-lg bg-circlo-green px-6 py-2.5 text-[14px] font-medium text-white opacity-60"
+              onClick={buatPesanan}
+              disabled={loading || !material}
+              className="rounded-lg bg-circlo-green px-6 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Buat Pesanan
+              {loading
+                ? "Memproses Pesanan..."
+                : "Buat Pesanan"}
             </button>
           )}
         </div>
       </section>
 
+      {/* BAGIAN KANAN: RINGKASAN */}
       <aside className="h-fit rounded-2xl bg-white p-6 shadow-card">
-        <h2 className="font-display text-[18px] font-semibold text-circlo-ink">Ringkasan Pesanan</h2>
-        <dl className="mt-4 space-y-3 text-[14px]">
-          <div className="flex items-start justify-between gap-3">
-            <dt className="text-circlo-muted">Jumlah</dt>
-            <dd className="font-medium text-circlo-ink">{data.jumlah || 0} unit</dd>
+        <h2 className="text-lg font-semibold text-circlo-ink">
+          Ringkasan Pesanan
+        </h2>
+
+        <div className="mt-5 space-y-4 text-sm">
+          <div>
+            <p className="text-circlo-muted">
+              Material
+            </p>
+            <p className="font-semibold">
+              {material?.nama_material || "-"}
+            </p>
           </div>
-          <div className="flex items-start justify-between gap-3">
-            <dt className="text-circlo-muted">Pengiriman</dt>
-            <dd className="text-right font-medium text-circlo-ink">{data.metodeKirim}</dd>
+
+          <div className="flex justify-between gap-3">
+            <span>Harga Satuan</span>
+            <span>
+              {rupiah(material?.harga || 0)}
+            </span>
           </div>
-          <div className="flex items-start justify-between gap-3">
-            <dt className="text-circlo-muted">Pembayaran</dt>
-            <dd className="text-right font-medium text-circlo-ink">{data.metodePembayaran}</dd>
+
+          <div className="flex justify-between gap-3">
+            <span>Jumlah</span>
+            <span>
+              {data.jumlah}{" "}
+              {material?.satuan || "unit"}
+            </span>
           </div>
-          <div className="flex items-start justify-between gap-3 border-t border-circlo-line pt-3">
-            <dt className="font-semibold text-circlo-ink">Total estimasi</dt>
-            <dd className="font-semibold text-circlo-ink">Rp0</dd>
+
+          <div className="flex justify-between gap-3">
+            <span>Pengiriman</span>
+            <span>{data.metodeKirim}</span>
           </div>
-        </dl>
-        <p className="mt-4 text-[12.5px] leading-relaxed text-circlo-muted">
-          Total dihitung dari harga material dan jumlah pesanan. Hubungkan ringkasan ini dengan data material yang dipilih.
+
+          <div className="flex justify-between gap-3">
+            <span>Pembayaran</span>
+           <span>
+  {data.metodePembayaran} - {data.bank}
+</span>
+          </div>
+
+          <div className="flex justify-between border-t pt-4 text-base font-bold">
+            <span>Subtotal</span>
+            <span className="text-circlo-green">
+              {rupiah(subtotal)}
+            </span>
+          </div>
+        </div>
+
+        <p className="mt-5 text-xs leading-relaxed text-circlo-muted">
+          Subtotal dihitung dari harga material.
+          Belum termasuk biaya pengiriman.
+          Harga dan stok akan diverifikasi kembali
+          oleh server saat pesanan dibuat.
         </p>
       </aside>
     </div>
