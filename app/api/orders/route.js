@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { roleFromUser } from "@/lib/roles";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -55,23 +56,160 @@ async function buyerFor(admin, user, alamat = "") {
   return created.data;
 }
 
-async function sellerFor(admin, user) {
+async function sellerFor(admin, user, { create = false } = {}) {
   const found = await admin
     .from("penjual")
-    .select("id_seller")
+    .select("id_seller,nama_seller,email_seller,alamat_seller")
     .eq("auth_user_id", user.id)
     .limit(1)
     .maybeSingle();
-  return found.data || null;
+
+  if (found.error) throw new Error(`Gagal membaca data penjual: ${found.error.message}`);
+  if (found.data) return found.data;
+  if (!create) return null;
+
+  const created = await admin
+    .from("penjual")
+    .insert({
+      auth_user_id: user.id,
+      nama_seller:
+        user.user_metadata?.nama || user.user_metadata?.full_name || user.email || "Penjual CIRCLO",
+      email_seller: user.email || `${user.id}@circlo.local`,
+      password_seller: crypto.randomUUID(),
+      status_seller: true,
+      alamat_seller: "",
+    })
+    .select("id_seller,nama_seller,email_seller,alamat_seller")
+    .single();
+
+  if (created.error) throw new Error(`Gagal membuat data penjual: ${created.error.message}`);
+  return created.data;
 }
+
+function isMissingColumn(error) {
+  return (
+    error?.code === "PGRST204" ||
+    error?.code === "42703" ||
+    /Could not find the '.*' column|column .* does not exist/i.test(error?.message || "")
+  );
+}
+
+const MATERIAL_COLUMNS =
+  "id_material,id_seller,nama_material,kategori,kota,provinsi,satuan,harga,stok,status_material";
+const MATERIAL_EXTRA_COLUMNS = ",foto_url,kondisi_seller,kategori_ai,skor_ai";
 
 async function materialsById(admin, ids) {
   if (!ids.length) return new Map();
-  const { data } = await admin
+
+  let result = await admin
     .from("material")
-    .select("id_material,nama_material,kategori,kota,provinsi,satuan,harga")
+    .select(`${MATERIAL_COLUMNS}${MATERIAL_EXTRA_COLUMNS}`)
     .in("id_material", ids);
-  return new Map((data || []).map((row) => [row.id_material, row]));
+
+  if (result.error && isMissingColumn(result.error)) {
+    result = await admin.from("material").select(MATERIAL_COLUMNS).in("id_material", ids);
+  }
+  if (result.error) throw new Error(result.error.message);
+
+  return new Map((result.data || []).map((row) => [row.id_material, row]));
+}
+
+async function buyersById(admin, ids) {
+  if (!ids.length) return new Map();
+  const { data, error } = await admin
+    .from("pembeli")
+    .select("id_buyer,nama_buyer,email_buyer")
+    .in("id_buyer", ids);
+  if (error) throw new Error(`Gagal membaca data pembeli: ${error.message}`);
+  return new Map((data || []).map((row) => [row.id_buyer, row]));
+}
+
+function statusKey(value) {
+  const status = String(value || "").toLowerCase();
+  if (/tolak|batal/.test(status)) return "rejected";
+  if (/selesai|diterima/.test(status)) return "completed";
+  if (/salur|kirim|siap/.test(status)) return "distributed";
+  if (/proses/.test(status) || (/konfirmasi/.test(status) && !/menunggu/.test(status))) {
+    return "confirmed";
+  }
+  return "pending";
+}
+
+function buildSummary(orders) {
+  const completedOrders = orders.filter((order) => statusKey(order.status_pesanan) === "completed");
+  const impactKg = completedOrders.reduce(
+    (sum, order) =>
+      sum +
+      (order.items || [])
+        .filter((item) => String(item.satuan || "").toLowerCase() === "kg")
+        .reduce((itemSum, item) => itemSum + Number(item.kuantitas_pesan || 0), 0),
+    0,
+  );
+  const completedUnits = completedOrders.reduce(
+    (sum, order) =>
+      sum + (order.items || []).reduce((itemSum, item) => itemSum + Number(item.kuantitas_pesan || 0), 0),
+    0,
+  );
+
+  return {
+    pending: orders.filter((order) => statusKey(order.status_pesanan) === "pending").length,
+    ready: orders.filter((order) => ["confirmed", "distributed"].includes(statusKey(order.status_pesanan)))
+      .length,
+    completed: completedOrders.length,
+    impact_kg: Math.round(impactKg * 100) / 100,
+    completed_units: Math.round(completedUnits * 100) / 100,
+  };
+}
+
+async function impactRank(admin, sellerId) {
+  try {
+    const done = await admin
+      .from("pesanan")
+      .select("id_pesanan")
+      .eq("status_pesanan", "Selesai")
+      .limit(1000);
+    if (done.error) return null;
+
+    const orderIds = (done.data || []).map((row) => row.id_pesanan);
+    if (!orderIds.length) return null;
+
+    const details = await admin
+      .from("detail_pesanan")
+      .select("id_material,kuantitas_pesan")
+      .in("id_pesanan", orderIds)
+      .limit(5000);
+    if (details.error || !details.data?.length) return null;
+
+    const materialIds = [...new Set(details.data.map((row) => row.id_material))];
+    const materials = await admin
+      .from("material")
+      .select("id_material,id_seller,satuan")
+      .in("id_material", materialIds);
+    if (materials.error) return null;
+
+    const materialMap = new Map((materials.data || []).map((row) => [row.id_material, row]));
+    const totals = new Map();
+
+    for (const detail of details.data) {
+      const material = materialMap.get(detail.id_material);
+      if (!material || String(material.satuan || "").toLowerCase() !== "kg") continue;
+      const current = totals.get(material.id_seller) || 0;
+      totals.set(material.id_seller, current + Number(detail.kuantitas_pesan || 0));
+    }
+
+    if (!totals.size) return null;
+    const sorted = [...totals.entries()].sort((a, b) => b[1] - a[1]);
+    const index = sorted.findIndex(([id]) => id === sellerId);
+    if (index < 0) return null;
+
+    return {
+      rank: index + 1,
+      total_sellers: sorted.length,
+      top_kg: Math.round(sorted[0][1] * 100) / 100,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export async function POST(request) {
@@ -187,7 +325,7 @@ export async function POST(request) {
 
   await admin.from("riwayat_pesanan").insert({
     id_pesanan: order.id_pesanan,
-    status_update: "Pesanan dibuat, menunggu konfirmasi penjual",
+    status_update: "Menunggu Konfirmasi",
     waktu_update: now,
   });
 
@@ -206,6 +344,12 @@ export async function POST(request) {
   });
 }
 
+async function sellerPayload(admin, seller, orders) {
+  const summary = buildSummary(orders);
+  summary.rank = await impactRank(admin, seller.id_seller);
+  return { role: "seller", seller, summary, orders };
+}
+
 export async function GET(request) {
   const admin = adminClient();
   if (!admin) {
@@ -215,6 +359,8 @@ export async function GET(request) {
   const auth = await authUser(admin, request);
   if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
+  const scope = new URL(request.url).searchParams.get("scope");
+
   try {
     const buyer = await admin
       .from("pembeli")
@@ -222,49 +368,73 @@ export async function GET(request) {
       .eq("auth_user_id", auth.user.id)
       .limit(1)
       .maybeSingle();
+    if (buyer.error) throw new Error(buyer.error.message);
 
+    const wantsSeller = scope === "seller";
     let orders = [];
     let role = "buyer";
+    let seller = null;
+    let ownIds = null;
 
-    if (buyer.data) {
+    if (buyer.data && !wantsSeller) {
       const result = await admin
         .from("pesanan")
-        .select("id_pesanan,total_estimasi,metode_kirim,status_pesanan,tgl_pesan")
+        .select("id_pesanan,id_buyer,total_estimasi,metode_kirim,status_pesanan,tgl_pesan")
         .eq("id_buyer", buyer.data.id_buyer)
         .order("tgl_pesan", { ascending: false })
         .limit(50);
       if (result.error) throw new Error(result.error.message);
       orders = result.data || [];
     } else {
-      const seller = await sellerFor(admin, auth.user);
-      if (!seller) return NextResponse.json({ role: "buyer", orders: [] });
+      const canCreate = roleFromUser(auth.user) === "seller";
+      seller = await sellerFor(admin, auth.user, { create: canCreate });
+      if (!seller) {
+        if (wantsSeller) {
+          return NextResponse.json({ error: "Akun ini bukan akun penjual." }, { status: 403 });
+        }
+        return NextResponse.json({ role: "buyer", orders: [] });
+      }
 
       role = "seller";
       const ownMaterials = await admin
         .from("material")
         .select("id_material")
         .eq("id_seller", seller.id_seller);
+      if (ownMaterials.error) throw new Error(ownMaterials.error.message);
+
       const ids = (ownMaterials.data || []).map((row) => row.id_material);
-      if (!ids.length) return NextResponse.json({ role, orders: [] });
+      ownIds = new Set(ids);
+      if (!ids.length) {
+        return NextResponse.json(await sellerPayload(admin, seller, []));
+      }
 
       const details = await admin
         .from("detail_pesanan")
         .select("id_pesanan")
         .in("id_material", ids);
+      if (details.error) throw new Error(details.error.message);
+
       const orderIds = [...new Set((details.data || []).map((row) => row.id_pesanan))];
-      if (!orderIds.length) return NextResponse.json({ role, orders: [] });
+      if (!orderIds.length) {
+        return NextResponse.json(await sellerPayload(admin, seller, []));
+      }
 
       const result = await admin
         .from("pesanan")
-        .select("id_pesanan,total_estimasi,metode_kirim,status_pesanan,tgl_pesan")
+        .select("id_pesanan,id_buyer,total_estimasi,metode_kirim,status_pesanan,tgl_pesan")
         .in("id_pesanan", orderIds)
         .order("tgl_pesan", { ascending: false })
-        .limit(50);
+        .limit(100);
       if (result.error) throw new Error(result.error.message);
       orders = result.data || [];
     }
 
-    if (!orders.length) return NextResponse.json({ role, orders: [] });
+    if (!orders.length) {
+      if (role === "seller" && seller) {
+        return NextResponse.json(await sellerPayload(admin, seller, []));
+      }
+      return NextResponse.json({ role, orders: [] });
+    }
 
     const orderIds = orders.map((order) => order.id_pesanan);
     const { data: details, error: detailError } = await admin
@@ -273,38 +443,56 @@ export async function GET(request) {
       .in("id_pesanan", orderIds);
     if (detailError) throw new Error(detailError.message);
 
+    const visibleDetails = (details || []).filter((row) => !ownIds || ownIds.has(row.id_material));
     const materials = await materialsById(
       admin,
-      [...new Set((details || []).map((row) => row.id_material))],
+      [...new Set(visibleDetails.map((row) => row.id_material))],
+    );
+    const buyers = await buyersById(
+      admin,
+      [...new Set(orders.map((order) => order.id_buyer).filter(Boolean))],
     );
 
     const itemsByOrder = new Map();
-    for (const detail of details || []) {
+    for (const detail of visibleDetails) {
       const material = materials.get(detail.id_material) || {};
       const items = itemsByOrder.get(detail.id_pesanan) || [];
       items.push({
         id_detail: detail.id_detail,
         id_material: detail.id_material,
+        id_seller: material.id_seller ?? null,
         nama_material: material.nama_material || `Material #${detail.id_material}`,
         kategori: material.kategori || null,
+        label: material.kategori_ai || material.kondisi_seller || material.kategori || null,
         kota: material.kota || null,
         provinsi: material.provinsi || null,
         satuan: material.satuan || "unit",
         harga: Number(detail.subtotal || 0) / (Number(detail.kuantitas_pesan) || 1),
         kuantitas_pesan: Number(detail.kuantitas_pesan || 0),
         subtotal: Number(detail.subtotal || 0),
+        foto_url: material.foto_url || null,
+        stok: Number(material.stok || 0),
+        status_material: material.status_material !== false,
       });
       itemsByOrder.set(detail.id_pesanan, items);
     }
 
-    return NextResponse.json({
-      role,
-      orders: orders.map((order) => ({
+    const payloadOrders = orders.map((order) => {
+      const items = itemsByOrder.get(order.id_pesanan) || [];
+      return {
         ...order,
         total_estimasi: Number(order.total_estimasi || 0),
-        items: itemsByOrder.get(order.id_pesanan) || [],
-      })),
+        seller_total: items.reduce((sum, item) => sum + Number(item.subtotal || 0), 0),
+        buyer: buyers.get(order.id_buyer) || null,
+        items,
+      };
     });
+
+    if (role === "seller" && seller) {
+      return NextResponse.json(await sellerPayload(admin, seller, payloadOrders));
+    }
+
+    return NextResponse.json({ role, orders: payloadOrders });
   } catch (err) {
     return NextResponse.json({ error: err.message || "Gagal membaca pesanan." }, { status: 500 });
   }

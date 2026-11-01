@@ -21,6 +21,204 @@ async function authUser(admin, request) {
   return { user: data.user };
 }
 
+function statusKey(value) {
+  const status = String(value || "").toLowerCase();
+  if (/tolak|batal/.test(status)) return "rejected";
+  if (/selesai|diterima/.test(status)) return "completed";
+  if (/salur|kirim|siap/.test(status)) return "distributed";
+  if (/proses/.test(status) || (/konfirmasi/.test(status) && !/menunggu/.test(status))) {
+    return "confirmed";
+  }
+  return "pending";
+}
+
+async function sellerFor(admin, user) {
+  const found = await admin
+    .from("penjual")
+    .select("id_seller")
+    .eq("auth_user_id", user.id)
+    .limit(1)
+    .maybeSingle();
+  if (found.error) throw new Error(`Gagal membaca data penjual: ${found.error.message}`);
+  return found.data || null;
+}
+
+async function ownedOrder(admin, idPesanan, sellerId) {
+  const details = await admin
+    .from("detail_pesanan")
+    .select("id_detail,id_material,kuantitas_pesan")
+    .eq("id_pesanan", idPesanan);
+  if (details.error) throw new Error(details.error.message);
+
+  const rows = details.data || [];
+  if (!rows.length) return { details: [], materials: [], owned: [] };
+
+  const materialIds = [...new Set(rows.map((row) => row.id_material))];
+  const materials = await admin
+    .from("material")
+    .select("id_material,id_seller,stok")
+    .in("id_material", materialIds);
+  if (materials.error) throw new Error(materials.error.message);
+
+  const owned = (materials.data || []).filter((row) => row.id_seller === sellerId);
+  return { details: rows, materials: materials.data || [], owned };
+}
+
+function transitionFor(action, current, order) {
+  if (action === "confirm") {
+    if (current !== "pending") return { error: "Pesanan ini tidak lagi menunggu konfirmasi." };
+    return { to: "Dikonfirmasi", history: "Dikonfirmasi" };
+  }
+
+  if (action === "reject") {
+    if (current !== "pending") return { error: "Pesanan ini tidak lagi menunggu konfirmasi." };
+    return { to: "Ditolak", history: "Ditolak penjual", restoreStock: true };
+  }
+
+  if (action === "ship") {
+    if (current !== "confirmed") return { error: "Pesanan harus dikonfirmasi terlebih dahulu." };
+    if (order.metode_kirim !== "Dikirim") {
+      return { error: "Aksi ini hanya untuk pesanan dengan metode Dikirim." };
+    }
+    return { to: "Disalurkan", history: "Disalurkan" };
+  }
+
+  if (action === "complete") {
+    if (current === "distributed") return { to: "Selesai", history: "Selesai" };
+    if (current === "confirmed" && order.metode_kirim === "Ambil di tempat") {
+      return { to: "Selesai", history: "Selesai" };
+    }
+    if (current === "confirmed" && order.metode_kirim === "Dikirim") {
+      return { error: "Tandai pesanan sudah dikirim sebelum menyelesaikannya." };
+    }
+    return { error: "Status pesanan tidak dapat diselesaikan dari tahap ini." };
+  }
+
+  return { error: "Aksi pesanan tidak dikenal." };
+}
+
+export async function PATCH(request, { params }) {
+  const admin = adminClient();
+  if (!admin) {
+    return NextResponse.json({ error: "Supabase belum dikonfigurasi di server." }, { status: 500 });
+  }
+
+  const auth = await authUser(admin, request);
+  if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
+  const idPesanan = Number(params?.id);
+  if (!Number.isInteger(idPesanan) || idPesanan <= 0) {
+    return NextResponse.json({ error: "ID pesanan tidak valid." }, { status: 400 });
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Request tidak valid." }, { status: 400 });
+  }
+
+  const action = String(body.action || "").trim();
+  const expectedStatus = body.expected_status ? String(body.expected_status) : null;
+
+  try {
+    const seller = await sellerFor(admin, auth.user);
+    if (!seller) {
+      return NextResponse.json({ error: "Akun ini bukan akun penjual." }, { status: 403 });
+    }
+
+    const orderResult = await admin
+      .from("pesanan")
+      .select("id_pesanan,id_buyer,status_pesanan,metode_kirim")
+      .eq("id_pesanan", idPesanan)
+      .maybeSingle();
+    if (orderResult.error) throw new Error(orderResult.error.message);
+
+    const order = orderResult.data;
+    if (!order) {
+      return NextResponse.json({ error: "Pesanan tidak ditemukan." }, { status: 404 });
+    }
+
+    const ownership = await ownedOrder(admin, idPesanan, seller.id_seller);
+    if (!ownership.owned.length) {
+      return NextResponse.json(
+        { error: "Pesanan ini tidak memuat material milik Anda." },
+        { status: 403 },
+      );
+    }
+    if (ownership.owned.length !== ownership.materials.length) {
+      return NextResponse.json(
+        { error: "Pesanan ini memuat material dari penjual lain dan belum dapat diubah dari dashboard ini." },
+        { status: 409 },
+      );
+    }
+
+    if (expectedStatus && expectedStatus !== order.status_pesanan) {
+      return NextResponse.json(
+        { error: "Status pesanan sudah berubah. Muat ulang data pesanan." },
+        { status: 409 },
+      );
+    }
+
+    const transition = transitionFor(action, statusKey(order.status_pesanan), order);
+    if (transition.error) {
+      return NextResponse.json({ error: transition.error }, { status: 409 });
+    }
+
+    const updated = await admin
+      .from("pesanan")
+      .update({ status_pesanan: transition.to })
+      .eq("id_pesanan", idPesanan)
+      .eq("status_pesanan", order.status_pesanan)
+      .select("id_pesanan,status_pesanan")
+      .maybeSingle();
+
+    if (updated.error) throw new Error(updated.error.message);
+    if (!updated.data) {
+      return NextResponse.json(
+        { error: "Status pesanan sudah berubah. Muat ulang data pesanan." },
+        { status: 409 },
+      );
+    }
+
+    const now = new Date().toISOString();
+    const history = await admin.from("riwayat_pesanan").insert({
+      id_pesanan: idPesanan,
+      status_update: transition.history,
+      waktu_update: now,
+    });
+
+    if (transition.restoreStock) {
+      const ownedIds = new Set(ownership.owned.map((row) => row.id_material));
+      for (const detail of ownership.details) {
+        if (!ownedIds.has(detail.id_material)) continue;
+
+        const latest = await admin
+          .from("material")
+          .select("stok")
+          .eq("id_material", detail.id_material)
+          .maybeSingle();
+        if (latest.error || !latest.data) continue;
+
+        await admin
+          .from("material")
+          .update({ stok: Number(latest.data.stok || 0) + Number(detail.kuantitas_pesan || 0) })
+          .eq("id_material", detail.id_material);
+      }
+    }
+
+    return NextResponse.json({
+      ok: true,
+      id_pesanan: idPesanan,
+      status_pesanan: updated.data.status_pesanan,
+      history_saved: !history.error,
+      ...(history.error ? { warning: "Status tersimpan, tetapi riwayat status gagal dicatat." } : {}),
+    });
+  } catch (err) {
+    return NextResponse.json({ error: err.message || "Gagal memperbarui pesanan." }, { status: 500 });
+  }
+}
+
 // Skor AI (0-100) dibuat menjadi huruf nilai untuk lencana kecil di foto material.
 function gradeFromScore(score) {
   const value = Number(score);
