@@ -1,13 +1,14 @@
 import Navbar from '@/components/Navbar';
+import MaterialCatalog from '@/components/MaterialCatalog';
 
-// Placeholder: halaman marketplace dikerjakan anggota lain. Cukup jadi tujuan redirect setelah Confirm.
-export default function MarketplacePlaceholder() {
+// Halaman Material Catalog. Juga menjadi tujuan redirect setelah Seller menekan Confirm
+// di halaman upload material (user story 5.5).
+export default function MarketplacePage() {
   return (
     <>
       <Navbar />
-      <main className="mx-auto max-w-[736px] px-8 pt-24 text-center">
-        <h1 className="font-display text-[28px] font-semibold">Marketplace</h1>
-        <p className="mt-3 text-circlo-muted">Halaman ini masih placeholder. Material yang dikonfirmasi akan tampil di sini setelah katalog tersambung.</p>
+      <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+        <MaterialCatalog />
       </main>
     </>
   );
