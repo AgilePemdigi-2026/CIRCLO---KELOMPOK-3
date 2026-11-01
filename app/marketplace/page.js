@@ -1,8 +1,6 @@
-import Navbar from '@/components/Navbar';
-import MaterialCatalog from '@/components/MaterialCatalog';
+import Navbar from "@/components/Navbar";
+import MaterialCatalog from "@/components/MaterialCatalog";
 
-// Halaman Material Catalog. Juga menjadi tujuan redirect setelah Seller menekan Confirm
-// di halaman upload material (user story 5.5).
 export default function MarketplacePage() {
   return (
     <>
