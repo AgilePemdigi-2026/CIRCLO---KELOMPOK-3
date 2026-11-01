@@ -2,11 +2,12 @@ import Link from 'next/link';
 import { createClient } from '@supabase/supabase-js';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import SapaanNama from '@/components/SapaanNama';
 
 export const dynamic = 'force-dynamic';
 
 // Ubah fungsi ini kalau rute halaman Material Detail di aplikasimu berbeda.
-const hrefDetail = (m) => `/marketplace/${m.id}`;
+const hrefDetail = (m) => `/katalog/${m.id_material}`;
 
 // Material populer + jumlah material, dibaca di server dari tabel `material`.
 // Kunci Supabase tidak sampai ke browser.
@@ -29,8 +30,17 @@ async function getData() {
   }
 }
 
-const nama = (m) => m.nama_material || m.nama || m.judul || 'Material';
-const foto = (m) => m.foto_url || m.gambar || m.image_url || m.foto || null;
+const nama = (m) => m.nama_material || 'Material';
+// Ilustrasi per kategori, sama seperti yang dipakai halaman Material Catalog.
+const KATEGORI_GAMBAR = [
+  'kaca', 'karet', 'kayu', 'kertas', 'kulit', 'logam',
+  'organik', 'plastik', 'spanduk', 'tekstil',
+];
+const gambarKategori = (kategori) => {
+  const slug = String(kategori || '').toLowerCase();
+  return `/images/materials/${KATEGORI_GAMBAR.includes(slug) ? slug : 'lainnya'}.svg`;
+};
+const foto = (m) => m.foto_url || gambarKategori(m.kategori);
 // Badge skor hanya tampil kalau tabel material punya kolom skor.
 const skor = (m) => m.match_score ?? m.skor ?? m.eco_score ?? null;
 
@@ -135,26 +145,28 @@ function KartuMaterial({ m, besar }) {
   return (
     <Link
       href={hrefDetail(m)}
-      className={`group relative block overflow-hidden rounded-2xl bg-gradient-to-br from-[#dfe8d3] to-[#c9d9b4] shadow-sm transition hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#3f6a0b] ${
+      className={`group relative flex flex-col overflow-hidden rounded-2xl bg-[#26301a] shadow-sm transition hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#3f6a0b] ${
         besar ? 'min-h-[320px] sm:col-span-2 sm:row-span-2 sm:min-h-[420px]' : 'min-h-[200px]'
       }`}
     >
-      {src ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt="" className="absolute inset-0 h-full w-full object-cover" />
-      ) : (
-        <IkonDaun className="absolute left-1/2 top-1/3 h-14 w-14 -translate-x-1/2 text-white/60" />
-      )}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+      {/* Area gambar. Bagian tengah ilustrasi yang ditampilkan, sama seperti di katalog. */}
+      <div className="relative flex-1 overflow-hidden bg-[#e8efdc]">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={src}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover object-[50%_35%]"
+        />
+        {nilaiSkor !== null && (
+          <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-bold text-circlo-ink shadow-sm">
+            <IkonDaun className="h-3.5 w-3.5 text-[#3f6a0b]" />
+            {nilaiSkor}
+          </span>
+        )}
+      </div>
 
-      {nilaiSkor !== null && (
-        <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-bold text-circlo-ink shadow-sm">
-          <IkonDaun className="h-3.5 w-3.5 text-[#3f6a0b]" />
-          {nilaiSkor}
-        </span>
-      )}
-
-      <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-4 text-white">
+      {/* Strip teks */}
+      <div className="flex items-end justify-between gap-3 p-4 text-white">
         <div className="min-w-0">
           {m.kategori && (
             <span className="inline-block rounded-full bg-[#5a5f1e] px-3 py-1 text-xs font-medium">
@@ -190,7 +202,7 @@ export default async function BuyerPage() {
           <div className="pointer-events-none absolute -bottom-20 -right-12 h-64 w-64 rounded-full bg-[#e8dcc4]/70 blur-3xl" />
 
           <div className="relative">
-            <h1 className="font-display text-4xl font-bold text-[#3f6a0b] sm:text-5xl">Halo, Buyer.</h1>
+            <h1 className="font-display text-4xl font-bold text-[#3f6a0b] sm:text-5xl">Halo, <SapaanNama />.</h1>
             <p className="mx-auto mt-3 max-w-xl font-display text-xl font-semibold text-circlo-ink sm:text-2xl">
               Apa yang ingin Anda buat atau temukan hari ini?
             </p>
@@ -272,7 +284,7 @@ export default async function BuyerPage() {
           <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {utama && <KartuMaterial m={utama} besar />}
             {lain.map((m) => (
-              <KartuMaterial key={m.id} m={m} />
+              <KartuMaterial key={m.id_material} m={m} />
             ))}
             <Link
               href="/marketplace"
