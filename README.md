@@ -28,6 +28,55 @@ Browser -> Next.js -> `/api/classify-material` -> CIRCLO AI Service (Python/Fast
 Menu navbar mengikuti peran (Buyer, Seller, Pemerintah) di `lib/roles.js`. Pesan sukses setelah redirect
 (mis. "Material uploaded successfully") ditampilkan oleh `components/FlashBanner.js` yang sudah ada di Navbar,
 jadi halaman milik anggota lain otomatis ikut menampilkannya.
+
+## Pembagian Folder per Sprint
+
+Satu fitur dikerjakan di folder utamanya masing-masing agar perubahan antaranggota tidak saling menimpa.
+Komponen khusus fitur diletakkan di `components/<nama-fitur>/`, sedangkan API route di `app/api/<nama-fitur>/`.
+File bersama (`components/Navbar.js`, `components/Footer.js`, `lib/auth.js`, `lib/roles.js`, `lib/supabase.js`)
+sebaiknya diubah setelah dikoordinasikan agar tidak bentrok.
+
+### Sprint 1
+
+| Fitur | Folder / file utama | Catatan |
+| --- | --- | --- |
+| Register (Buyer, Seller) | `app/register/page.jsx`, `components/auth/` | Form dan validasi register untuk role buyer/seller. |
+| Login (Buyer, Seller, Government) | `app/login/page.jsx`, `components/auth/`, `lib/auth.js`, `lib/roles.js` | Redirect setelah login mengikuti role. Role dibaca dari metadata user. |
+| Cari Material: mengirim pesan ke AI | `app/cari-material/page.jsx` | Input pesan dan tampilan percakapan. |
+| Cari Material: AI merespons dan memberi rekomendasi | `app/api/chat/route.js`, `app/api/search/route.js`, `ai-service/`, `circlo_ai/` | Frontend di `app/cari-material`; logika respons dan rekomendasi ada di `ai-service/` dan `circlo_ai/`. |
+| Upload Material: input form detail material | `app/upload-material/page.js`, `app/upload-material/result/page.js`, `lib/materials.js`, `supabase/materials.sql` | Isian deskripsi, jumlah, kondisi, harga, lokasi, dan foto. Mode edit lewat `?id=`. |
+| Upload Material: AI membantu klasifikasi | `app/api/classify-material/route.js`, `app/api/generate-description/route.js`, `ai-service/main.py` | Hasil klasifikasi dan deskripsi AI ditampilkan di `app/upload-material/result/page.js`. |
+
+### Sprint 2
+
+| Fitur | Folder / file utama | Catatan |
+| --- | --- | --- |
+| Dashboard Buyer | `app/buyer/page.jsx` | Ringkasan dan navigasi utama buyer. |
+| Material Catalog | `app/marketplace/page.js` | Daftar material. Saat ini masih placeholder, lanjutkan implementasinya di file ini. |
+| Material Detail | `app/katalog/[id]/page.jsx`, `components/MaterialImage.jsx`, `components/MaterialOrderPanel.jsx` | Detail material dan tombol untuk memesan. |
+| Dashboard Seller | `app/seller/page.jsx` | Ringkasan dan navigasi utama seller. |
+| KPI Ringkasan Penjualan | `app/seller/kpi/page.jsx` | Kartu KPI, pesanan terbaru, dan material terlaris. |
+| Mengelola Catalog | `app/seller/catalog/page.jsx`, `app/my-materials/page.js`, `app/upload-material/page.js`, `lib/materials.js` | Daftar, tambah, edit, dan atur status material milik seller. |
+| Mengelola Pesanan | `app/seller/orders/page.jsx`, `app/api/orders/route.js` | Konfirmasi pesanan masuk dan pembaruan status pesanan. |
+| Checkout: menentukan jumlah pesanan | `app/checkout/page.jsx`, `components/checkout/CheckoutFlow.jsx`, `components/checkout/JumlahPesananStep.jsx` | Langkah pertama checkout. |
+| Checkout: mengisi alamat | `components/checkout/AlamatPengirimanStep.jsx` | Langkah kedua checkout. |
+| Checkout: pembayaran | `components/checkout/PembayaranStep.jsx` | Langkah ketiga checkout. Integrasi pembayaran belum aktif. |
+| Profile (Buyer, Seller) | `app/profile/page.js`, `lib/auth.js`, `lib/roles.js` | Lihat profil, edit nama/telepon, dan keluar. |
+| Detail Pesanan (Buyer) | `app/orders/[id]/page.jsx`, `app/orders/page.jsx`, `app/api/orders/route.js` | Detail item, alamat, pembayaran, dan riwayat status pesanan. |
+
+### Sprint 3
+
+| Fitur | Folder / file utama | Catatan |
+| --- | --- | --- |
+| Cart (Buyer) | `app/cart/page.jsx` (belum ada), `components/cart/` (belum ada), `lib/cart.js` (opsional) | Buat folder ini untuk menampung material sebelum masuk ke checkout. |
+| Dashboard Government: KPI Laporan | `app/government/page.jsx`, `components/government/KpiLaporan.jsx` (belum ada) | Kembangkan dashboard pemerintah yang sudah ada di `app/government/page.jsx`. |
+| Dashboard Government: Chart | `components/government/ChartPenjualan.jsx` (belum ada) | Letakkan komponen chart khusus government di `components/government/`. |
+| Dashboard Government: Insight AI | `components/government/InsightAI.jsx` (belum ada), `ai-service/` | Insight bisa memakai layanan AI yang sudah ada atau endpoint baru di `app/api/`. |
+| Chat (Buyer, Seller) | `app/chat/page.jsx` (belum ada), `components/chat/` (belum ada) | Chat antarpengguna. `app/api/chat/route.js` yang sudah ada dipakai untuk AI Cari Material, jadi buat endpoint terpisah bila dibutuhkan. |
+
+Untuk mencoba halaman sesuai peran saat `npm run dev`, tambahkan query `?role=buyer`, `?role=seller`, atau
+`?role=government` pada URL. Contoh: `/checkout?role=buyer`, `/seller/kpi?role=seller`, dan
+`/orders/1?role=buyer`.
 🌱 *Turn Waste Into Worth.*
 
 ---

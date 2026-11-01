@@ -188,9 +188,19 @@ export default function OrdersPage() {
 
                 <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 bg-gray-50 px-5 py-3 text-sm">
                   <span className="text-gray-500">{order.metode_kirim || "Ambil di tempat"}</span>
-                  <span className="font-bold text-gray-900">
-                    Total {rupiah.format(order.total_estimasi)}
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className="font-bold text-gray-900">
+                      Total {rupiah.format(order.total_estimasi)}
+                    </span>
+                    {state.role === "buyer" && (
+                      <Link
+                        href={`/orders/${order.id_pesanan}`}
+                        className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-white"
+                      >
+                        Detail
+                      </Link>
+                    )}
+                  </div>
                 </div>
               </article>
             ))}
