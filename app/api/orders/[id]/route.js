@@ -21,8 +21,20 @@ async function authUser(admin, request) {
   return { user: data.user };
 }
 
+// Skor AI (0-100) dibuat menjadi huruf nilai untuk lencana kecil di foto material.
+function gradeFromScore(score) {
+  const value = Number(score);
+  if (!Number.isFinite(value) || value <= 0) return null;
+  if (value >= 90) return "A+";
+  if (value >= 80) return "A";
+  if (value >= 70) return "B+";
+  if (value >= 60) return "B";
+  return "C";
+}
+
 // GET /api/orders/:id
-// Detail satu pesanan milik buyer yang sedang login: item, alamat, pembayaran, riwayat status, dan ringkasan biaya.
+// Detail satu pesanan milik buyer yang sedang login (SRS 4.12 Melihat Status Pesanan):
+// status terbaru, riwayat status, material yang dipesan, ringkasan biaya, penjual, dan lokasi penjemputan.
 export async function GET(request, { params }) {
   const admin = adminClient();
   if (!admin) {
@@ -40,7 +52,7 @@ export async function GET(request, { params }) {
   try {
     const buyer = await admin
       .from("pembeli")
-      .select("id_buyer,nama_buyer,alamat_buyer")
+      .select("id_buyer")
       .eq("auth_user_id", auth.user.id)
       .limit(1)
       .maybeSingle();
@@ -72,10 +84,7 @@ export async function GET(request, { params }) {
     const materialIds = [...new Set((details || []).map((row) => row.id_material))];
     let materials = new Map();
     if (materialIds.length) {
-      const { data } = await admin
-        .from("material")
-        .select("id_material,nama_material,kategori,kota,provinsi,satuan,harga")
-        .in("id_material", materialIds);
+      const { data } = await admin.from("material").select("*").in("id_material", materialIds);
       materials = new Map((data || []).map((row) => [row.id_material, row]));
     }
 
@@ -88,6 +97,9 @@ export async function GET(request, { params }) {
         id_material: detail.id_material,
         nama_material: material.nama_material || `Material #${detail.id_material}`,
         kategori: material.kategori || null,
+        label: material.kategori_ai || material.kondisi_seller || material.kategori || null,
+        grade: gradeFromScore(material.skor_ai ?? material.skor),
+        foto_url: material.foto_url || material.image_url || null,
         kota: material.kota || null,
         provinsi: material.provinsi || null,
         satuan: material.satuan || "unit",
@@ -96,6 +108,28 @@ export async function GET(request, { params }) {
         subtotal,
       };
     });
+
+    // Penjual diambil dari material pertama di pesanan (satu pesanan satu material pada alur saat ini).
+    const firstMaterial = materials.get(details?.[0]?.id_material) || null;
+    let seller = null;
+    if (firstMaterial?.id_seller) {
+      const sellerResult = await admin
+        .from("penjual")
+        .select("*")
+        .eq("id_seller", firstMaterial.id_seller)
+        .maybeSingle();
+      const row = sellerResult.data;
+      if (row) {
+        const rating = Number(row.rating_seller ?? row.rating);
+        seller = {
+          id_seller: row.id_seller,
+          nama: row.nama_seller || `Penjual #${row.id_seller}`,
+          alamat: row.alamat_seller || null,
+          terverifikasi: row.status_seller === true,
+          rating: Number.isFinite(rating) && rating > 0 ? rating : null,
+        };
+      }
+    }
 
     const riwayatResult = await admin
       .from("riwayat_pesanan")
@@ -109,9 +143,8 @@ export async function GET(request, { params }) {
     }));
 
     const subtotal = items.reduce((sum, item) => sum + item.subtotal, 0);
-    const dikirim = order.metode_kirim === "Dikirim";
-    // Kolom pembayaran dan ongkir belum ada di skema pesanan; dibaca bila nanti ditambahkan.
-    const ongkir = order.ongkir ?? order.biaya_kirim ?? null;
+    // Biaya layanan belum punya kolom di skema pesanan. Dibaca bila nanti ditambahkan, selain itu Rp0.
+    const biayaLayanan = Number(order.biaya_layanan ?? 0) || 0;
 
     return NextResponse.json({
       order: {
@@ -119,19 +152,19 @@ export async function GET(request, { params }) {
         tgl_pesan: order.tgl_pesan,
         status_pesanan: order.status_pesanan || "Menunggu Konfirmasi",
         metode_kirim: order.metode_kirim || "Ambil di tempat",
-        total_estimasi: Number(order.total_estimasi || 0),
       },
       items,
-      alamat: dikirim ? buyer.data.alamat_buyer || null : null,
-      penerima: buyer.data.nama_buyer || null,
-      pembayaran: {
-        metode: order.metode_pembayaran || null,
-        status: order.status_pembayaran || null,
+      seller,
+      lokasi: {
+        nama: seller?.nama || null,
+        alamat: seller?.alamat || null,
+        kota: firstMaterial?.kota || null,
+        provinsi: firstMaterial?.provinsi || null,
       },
       ringkasan: {
         subtotal,
-        ongkir: ongkir === null ? null : Number(ongkir),
-        total: Number(order.total_estimasi || subtotal),
+        biaya_layanan: biayaLayanan,
+        total: subtotal + biayaLayanan,
       },
       riwayat,
     });

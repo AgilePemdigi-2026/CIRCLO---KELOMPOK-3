@@ -79,7 +79,7 @@ export default function OrdersPage() {
         <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
-              {state.role === "seller" ? "Pesanan Masuk" : "Pesanan Saya"}
+              {state.role === "seller" ? "Pesanan Masuk" : "Daftar Pesanan"}
             </h1>
             <p className="mt-1 text-sm text-gray-500">
               {state.role === "seller"
@@ -119,8 +119,16 @@ export default function OrdersPage() {
         )}
 
         {state.error && (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            {state.error}
+          <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            <p className="font-semibold">Data pesanan gagal dimuat</p>
+            <p className="mt-1">{state.error}</p>
+            <button
+              type="button"
+              onClick={load}
+              className="mt-3 rounded-lg bg-[#3f6a0b] px-4 py-2 text-sm font-semibold text-white hover:bg-[#345609]"
+            >
+              Muat ulang
+            </button>
           </div>
         )}
 
