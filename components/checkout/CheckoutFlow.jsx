@@ -4,8 +4,11 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getAccessToken } from "@/lib/auth";
+
 import JumlahPesananStep from "./JumlahPesananStep";
-import AlamatPengirimanStep from "./AlamatPengirimanStep";
+import AlamatPengirimanStep, {
+  validateAlamat,
+} from "./AlamatPengirimanStep";
 import PembayaranStep from "./PembayaranStep";
 
 const steps = ["Jumlah Pesanan", "Alamat", "Pembayaran"];
@@ -24,6 +27,7 @@ export default function CheckoutFlow() {
   const [material, setMaterial] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showAlamatErrors, setShowAlamatErrors] = useState(false);
 
   const [data, setData] = useState({
     jumlah: 1,
@@ -35,15 +39,12 @@ export default function CheckoutFlow() {
     provinsi: "",
     kodePos: "",
     metodePembayaran: "Virtual Account",
-bank: "BCA",
+    bank: "BCA",
   });
 
-  // Mengambil informasi awal material dari URL.
-  // Harga dan stok tetap diverifikasi server saat checkout.
+  // Mengambil data material dari URL
   useEffect(() => {
-    const params = new URLSearchParams(
-      window.location.search
-    );
+    const params = new URLSearchParams(window.location.search);
 
     const id = Number(params.get("id"));
     const harga = Number(params.get("harga"));
@@ -69,12 +70,23 @@ bank: "BCA",
     });
   }, []);
 
+  // Memperbarui data checkout
   const update = (patch) => {
     setData((prev) => ({
       ...prev,
       ...patch,
     }));
+
     setError("");
+
+    if (
+      Object.prototype.hasOwnProperty.call(
+        patch,
+        "metodeKirim"
+      )
+    ) {
+      setShowAlamatErrors(false);
+    }
   };
 
   const jumlah = Number(data.jumlah);
@@ -84,16 +96,13 @@ bank: "BCA",
       ? jumlah * material.harga
       : 0;
 
-  // Validasi jumlah pesanan
+  // Validasi jumlah dan metode pengiriman
   const validasiJumlah = () => {
     if (!material) {
       return "Pilih material terlebih dahulu.";
     }
 
-    if (
-      !Number.isInteger(jumlah) ||
-      jumlah <= 0
-    ) {
+    if (!Number.isInteger(jumlah) || jumlah <= 0) {
       return "Jumlah pesanan harus berupa bilangan bulat lebih dari 0.";
     }
 
@@ -112,40 +121,12 @@ bank: "BCA",
     return "";
   };
 
-  // Validasi seluruh form alamat
+  // Validasi alamat menggunakan validator bersama
   const validasiAlamat = () => {
-    if (data.metodeKirim === "Ambil di tempat") {
-      return "";
-    }
-
-    if (!data.namaPenerima.trim()) {
-      return "Nama penerima wajib diisi.";
-    }
-
-    if (!/^08\d{8,11}$/.test(data.nomorHp.trim())) {
-      return "Nomor HP harus diawali 08 dan berisi 10–13 digit.";
-    }
-
-    if (!data.alamat.trim()) {
-      return "Alamat lengkap wajib diisi.";
-    }
-
-    if (!data.kota.trim()) {
-      return "Kota/Kabupaten wajib diisi.";
-    }
-
-    if (!data.provinsi.trim()) {
-      return "Provinsi wajib diisi.";
-    }
-
-    if (!/^\d{5}$/.test(data.kodePos.trim())) {
-      return "Kode pos harus terdiri dari 5 angka.";
-    }
-
-    return "";
+    return validateAlamat(data);
   };
 
-  // Menggabungkan alamat untuk API pesanan saat ini
+  // Menggabungkan alamat menjadi satu string untuk API
   const alamatLengkap = () => {
     if (data.metodeKirim === "Ambil di tempat") {
       return "";
@@ -161,6 +142,7 @@ bank: "BCA",
     ].join(", ");
   };
 
+  // Tombol lanjut
   const lanjut = () => {
     setError("");
 
@@ -174,10 +156,14 @@ bank: "BCA",
     }
 
     if (step === 1) {
-      const pesan = validasiAlamat();
+      setShowAlamatErrors(true);
 
-      if (pesan) {
-        setError(pesan);
+      const errors = validasiAlamat();
+
+      if (Object.keys(errors).length > 0) {
+        setError(
+          "Lengkapi data alamat yang masih salah sebelum melanjutkan."
+        );
         return;
       }
     }
@@ -185,6 +171,7 @@ bank: "BCA",
     setStep((prev) => Math.min(prev + 1, 2));
   };
 
+  // Tombol kembali
   const kembali = () => {
     setError("");
     setStep((prev) => Math.max(prev - 1, 0));
@@ -195,15 +182,34 @@ bank: "BCA",
     if (loading) return;
 
     const errorJumlah = validasiJumlah();
-    const errorAlamat = validasiAlamat();
 
-    if (errorJumlah || errorAlamat) {
-      setError(errorJumlah || errorAlamat);
+    if (errorJumlah) {
+      setError(errorJumlah);
+      setStep(0);
+      return;
+    }
+
+    const errorsAlamat = validasiAlamat();
+
+    if (Object.keys(errorsAlamat).length > 0) {
+      setShowAlamatErrors(true);
+      setError(
+        "Data alamat belum valid. Periksa kembali informasi pengiriman."
+      );
+      setStep(1);
       return;
     }
 
     if (!data.metodePembayaran) {
       setError("Pilih metode pembayaran.");
+      return;
+    }
+
+    if (
+      data.metodePembayaran === "Virtual Account" &&
+      !["BCA", "BNI", "BRI", "Mandiri"].includes(data.bank)
+    ) {
+      setError("Pilih bank Virtual Account yang valid.");
       return;
     }
 
@@ -244,18 +250,17 @@ bank: "BCA",
       }
 
       if (!result.id_pesanan) {
-        throw new Error(
-          "ID pesanan tidak ditemukan."
-        );
+        throw new Error("ID pesanan tidak ditemukan.");
       }
 
-      // Langsung menuju halaman Pesanan Saya
+      // Setelah pesanan berhasil, menuju Pesanan Saya
       router.push("/orders");
       router.refresh();
     } catch (err) {
       setError(
-        err.message ||
-          "Terjadi kesalahan saat membuat pesanan."
+        err instanceof Error
+          ? err.message
+          : "Terjadi kesalahan saat membuat pesanan."
       );
     } finally {
       setLoading(false);
@@ -264,9 +269,8 @@ bank: "BCA",
 
   return (
     <div className="mt-8 grid gap-6 lg:grid-cols-[2fr_1fr]">
-      {/* BAGIAN KIRI: CHECKOUT */}
+      {/* BAGIAN KIRI */}
       <section className="rounded-2xl bg-white p-6 shadow-card sm:p-8">
-
         {/* Indikator langkah */}
         <div className="mb-8 flex flex-wrap gap-3">
           {steps.map((nama, index) => (
@@ -287,12 +291,12 @@ bank: "BCA",
 
         {!material && (
           <p className="mb-5 rounded-lg bg-amber-50 p-4 text-sm text-amber-800">
-            Belum ada material dipilih.
-            Silakan pilih material dari Material Catalog.
+            Belum ada material dipilih. Silakan pilih
+            material dari Material Catalog.
           </p>
         )}
 
-        {/* STEP 1: JUMLAH */}
+        {/* STEP 1: JUMLAH PESANAN */}
         {step === 0 && (
           <JumlahPesananStep
             data={data}
@@ -306,6 +310,7 @@ bank: "BCA",
           <AlamatPengirimanStep
             data={data}
             onChange={update}
+            showErrors={showAlamatErrors}
           />
         )}
 
@@ -367,6 +372,10 @@ bank: "BCA",
                 <p>
                   <strong>Metode Pembayaran:</strong>{" "}
                   {data.metodePembayaran}
+                  {data.metodePembayaran ===
+                    "Virtual Account" &&
+                    data.bank &&
+                    ` - ${data.bank}`}
                 </p>
 
                 <p className="font-bold">
@@ -409,7 +418,7 @@ bank: "BCA",
             <button
               type="button"
               onClick={lanjut}
-              disabled={!material}
+              disabled={!material || loading}
               className="rounded-lg bg-circlo-green px-6 py-3 font-semibold text-white disabled:opacity-50"
             >
               Lanjut
@@ -467,9 +476,13 @@ bank: "BCA",
 
           <div className="flex justify-between gap-3">
             <span>Pembayaran</span>
-           <span>
-  {data.metodePembayaran} - {data.bank}
-</span>
+            <span>
+              {data.metodePembayaran}
+              {data.metodePembayaran ===
+                "Virtual Account" &&
+                data.bank &&
+                ` - ${data.bank}`}
+            </span>
           </div>
 
           <div className="flex justify-between border-t pt-4 text-base font-bold">
