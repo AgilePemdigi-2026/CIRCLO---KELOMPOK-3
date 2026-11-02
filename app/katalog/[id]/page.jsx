@@ -73,6 +73,22 @@ export default async function MaterialDetailPage({ params }) {
   const m = await getMaterial(admin, id);
   if (!m) notFound();
 
+// Mengambil informasi toko berdasarkan ID seller material
+let seller = null;
+
+if (m.id_seller != null) {
+  const { data: sellerData, error: sellerError } = await admin
+    .from("penjual")
+    .select("id_seller, nama_seller, email_seller, status_seller")
+    .eq("id_seller", m.id_seller)
+    .maybeSingle();
+
+  if (sellerError) {
+    console.error("Gagal mengambil detail toko:", sellerError.message);
+  } else {
+    seller = sellerData;
+  }
+}
   const ada = tersedia(m);
   const rekomendasi = ada ? [] : await getRekomendasi(admin, m);
 
@@ -163,7 +179,65 @@ export default async function MaterialDetailPage({ params }) {
             </p>
           </div>
         </div>
+        {/* DETAIL TOKO */}
+        {seller && (
+          <section className="mt-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
 
+              <div className="flex items-center gap-4">
+                {/* Ikon Toko */}
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-green-100 text-[#3f6a0b]">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="30"
+                    height="30"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M3 10h18" />
+                    <path d="M5 10V21h14V10" />
+                    <path d="M4 3h16l2 7H2l2-7Z" />
+                    <path d="M9 21v-7h6v7" />
+                  </svg>
+                </div>
+
+                {/* Informasi Toko */}
+                <div>
+                  <p className="text-xs font-medium text-gray-500">
+                    Dijual oleh
+                  </p>
+
+                  <h3 className="mt-1 text-lg font-bold text-gray-800">
+                    {seller.nama_seller}
+                  </h3>
+
+                  <p className="mt-1 text-sm text-gray-500">
+                    {lokasi || "Lokasi belum tersedia"}
+                  </p>
+
+                  <p className="mt-1 text-xs text-gray-500">
+                    {seller.status_seller
+                      ? "Toko aktif"
+                      : "Status toko tidak aktif"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Tombol Kunjungi Toko */}
+              <Link
+                href={`/toko/${seller.id_seller}`}
+                className="inline-flex items-center justify-center rounded-lg border border-[#3f6a0b] px-5 py-3 text-sm font-semibold text-[#3f6a0b] transition hover:bg-green-50"
+              >
+                Kunjungi Toko
+              </Link>
+
+            </div>
+          </section>
+        )}
         {rekomendasi.length > 0 && (
           <section className="mt-8">
             <h2 className="text-lg font-bold text-gray-800">Material lain yang tersedia</h2>
