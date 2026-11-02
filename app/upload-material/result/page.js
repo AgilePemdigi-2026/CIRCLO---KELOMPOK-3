@@ -52,8 +52,43 @@ function ClassificationResult() {
   }
 
   const { form, photo, editId } = data;
-  const n = normalizeAi(data.result);
-  const isEdit = Boolean(editId);
+const isEdit = Boolean(editId);
+
+const demoAnalysis = {
+  nama: 'Sisa kain katun hitam',
+  jenis: 'Tekstil',
+  kategori: 'Tekstil',
+  subkategori: 'Kain Katun',
+  komposisi: 'Katun (belum terverifikasi secara fisik)',
+  kondisi: 'Kering',
+  dimensi: '236 m²',
+  skor: 90,
+  spesifikasi: [
+    { label: 'Jenis Material', value: 'Sisa kain katun' },
+    { label: 'Warna', value: 'Hitam' },
+    { label: 'Kondisi Fisik', value: 'Kering' },
+    { label: 'Jumlah Tersedia', value: '236 m²' },
+  ],
+  potensi_pemanfaatan: [
+    'Patchwork dan quilting untuk produk tekstil.',
+    'Kerajinan tangan seperti pouch, tote bag, dan dompet.',
+    'Bahan tambahan untuk produk fashion dan aksesori.',
+    'Upcycling tekstil menjadi produk baru bernilai guna.',
+  ],
+  catatan_buyer: [
+    'Pastikan ukuran potongan kain sesuai kebutuhan produksi.',
+    'Periksa kebersihan, ketebalan, dan kekuatan serat kain.',
+    'Konfirmasikan komposisi katun kepada Seller sebelum pembelian.',
+    'Harga yang ditawarkan adalah Rp3.000 per m².',
+  ],
+  tags: [
+    'Tekstil', 'KainKatun', 'KainHitam',
+    'SisaKain', 'Upcycling', 'BahanKerajinan',
+  ],
+  confidence: 'tinggi',
+};
+
+const n = demoAnalysis;
 
   async function onConfirm() {
     if (savingRef.current) return;

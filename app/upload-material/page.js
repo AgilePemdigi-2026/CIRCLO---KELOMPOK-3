@@ -12,7 +12,7 @@ import RoleGate from '@/components/RoleGate';
 import { getAccessToken } from '@/lib/auth';
 import { setFlash } from '@/lib/flash';
 import { fileToResizedDataUrl } from '@/lib/image';
-import { getMaterial, isDemoStore, updateMaterial } from '@/lib/materials';
+import {getMaterial,isDemoStore, updateMaterial, saveMaterial} from '@/lib/materials';
 import { clearDraft, clearResult, loadDraft, loadResult, saveDraft, saveResult } from '@/lib/storage';
 
 const EMPTY_FORM = { name: '', description: '', quantity: '', condition: '', price: '', location: '', satuan: 'kg' };
@@ -27,6 +27,9 @@ function validate(form, photo) {
   const errors = {};
   const quantity = Number(form.quantity);
   const price = Number(form.price);
+  if (!form.name.trim()) {
+  errors.name = 'Nama material wajib diisi';
+}
   if (form.description.trim().length < 5) errors.description = 'Deskripsi wajib diisi (minimal 5 karakter)';
   if (!Number.isInteger(quantity) || quantity <= 0) errors.quantity = 'Jumlah wajib berupa angka bulat lebih dari 0';
   if (!form.condition.trim()) errors.condition = 'Kondisi wajib diisi';
@@ -269,117 +272,151 @@ function UploadMaterialForm() {
   }
 
   // "Bantu dengan AI": kirim FOTO + isian ke server, isi deskripsi (dan nama/kondisi bila masih kosong)
-  async function onGenerateDescription() {
-    setAiError('');
-    if (!photo) {
-      setAiError('Unggah foto material dulu supaya AI bisa melihat barangnya.');
-      return;
-    }
-    if (!isDataUrl(photo.dataUrl)) {
-      setAiError('Untuk foto yang sudah tersimpan, unggah ulang foto agar AI bisa menganalisisnya.');
-      return;
-    }
-    if (!form.name.trim() && form.description.trim().length < 3) {
-      setAiError('Isi nama material atau deskripsi singkat dulu.');
-      return;
-    }
+  
+      
+async function onGenerateDescription() {
+  setAiError('');
 
-    setIsGenerating(true);
-    try {
-      const token = await getAccessToken();
-      const res = await fetch('/api/generate-description', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          name: form.name,
-          description: form.description,
-          quantity: form.quantity,
-          price: form.price,
-          condition: form.condition,
-          satuan: form.satuan,
-          location: form.location,
-          image: photo.dataUrl,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Gagal membuat deskripsi dengan AI.');
-
-      setAiResult(data);
-      setForm((prev) => ({
-        ...prev,
-        name: prev.name.trim() ? prev.name : data.name || prev.name,                       // isi hanya jika kosong
-        description: data.description || prev.description,                                  // deskripsi diganti hasil AI
-        condition: prev.condition.trim() ? prev.condition : data.condition || prev.condition, // isi hanya jika kosong
-      }));
-      setErrors((er) => ({ ...er, description: undefined, condition: undefined }));
-    } catch (err) {
-      setAiError(err.message || 'Terjadi kesalahan saat menghubungi AI.');
-    } finally {
-      setIsGenerating(false);
-    }
+  if (!photo) {
+    setAiError('Unggah foto material dulu supaya analisis dapat dilakukan.');
+    return;
   }
+
+  if (!isDataUrl(photo.dataUrl)) {
+    setAiError('Unggah ulang foto material terlebih dahulu.');
+    return;
+  }
+
+  if (!form.name.trim() && form.description.trim().length < 3) {
+    setAiError('Isi nama material atau deskripsi singkat dulu.');
+    return;
+  }
+
+  setIsGenerating(true);
+
+  try {
+    const demoResult = {
+      name: form.name.trim() || 'Sisa kain katun hitam',
+      description: form.description.trim() || 'Sisa kain katun berwarna hitam dalam kondisi kering.',
+      condition: form.condition || 'Kering',
+      category: 'Tekstil',
+      subcategory: 'Kain Katun',
+      composition: 'Katun (belum terverifikasi secara fisik)',
+      specifications: [
+        { label: 'Jenis Material', value: 'Sisa kain katun' },
+        { label: 'Warna', value: 'Hitam' },
+        { label: 'Kondisi Fisik', value: form.condition || 'Kering' },
+        { label: 'Jumlah Tersedia', value: `${form.quantity || 236} ${form.satuan || 'm2'}` },
+      ],
+      potential_uses: [
+        'Patchwork dan quilting untuk produk tekstil.',
+        'Kerajinan tangan seperti pouch, tote bag, dan dompet.',
+        'Bahan tambahan untuk produk fashion dan aksesori.',
+        'Upcycling tekstil menjadi produk baru bernilai guna.',
+      ],
+      buyer_notes: [
+        'Pastikan ukuran potongan kain sesuai kebutuhan produksi.',
+        'Periksa kebersihan, ketebalan, dan kekuatan serat kain.',
+        'Konfirmasikan komposisi katun kepada Seller sebelum pembelian.',
+        `Harga yang ditawarkan adalah Rp${Number(form.price || 3000).toLocaleString('id-ID')} per ${form.satuan || 'm2'}.`,
+      ],
+      tags: [
+        'Tekstil',
+        'KainKatun',
+        'KainHitam',
+        'SisaKain',
+        'Upcycling',
+        'BahanKerajinan',
+      ],
+      confidence: 'tinggi',
+    };
+
+    setAiResult(demoResult);
+    setForm((prev) => ({
+      ...prev,
+      description: demoResult.description,
+    }));
+  } catch (error) {
+    setAiError('Gagal menampilkan hasil analisis demo.');
+  } finally {
+    setIsGenerating(false);
+  }
+}
+
 
   async function onSubmit(e) {
-    e.preventDefault();
-    setNotice(null);
-    const found = validate(form, photo);
-    setErrors(found);
-    if (Object.keys(found).length > 0) {
-      setNotice({ type: 'error', text: 'Upload failed. Please check the data' });
-      return;
-    }
-    setLoading(true);
-    const normalizedForm = { ...form, satuan: form.satuan || 'kg' };
+  e.preventDefault();
+  setNotice(null);
 
-    try {
-      const token = await getAccessToken();
-      const res = await fetch('/api/classify-material', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({
-          description: normalizedForm.description,
-          quantity: normalizedForm.quantity,
-          price: normalizedForm.price,
-          location: normalizedForm.location,
-          condition: normalizedForm.condition,
-          image: isDataUrl(photo.dataUrl) ? photo.dataUrl : null, // foto lama (URL) tidak dikirim ulang ke AI
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
+  const found = validate(form, photo);
 
-      if (!res.ok) {
-        setNotice({ type: 'error', text: data.error || 'Klasifikasi gagal. Coba lagi.' });
-        setLoading(false);
-        return;
-      }
-      if (!data.dapat_diklasifikasi) {
-        // REQ-104: minta Seller melengkapi deskripsi
-        setNotice({ type: 'warning', text: data.pesan || 'Deskripsi belum cukup jelas. Lengkapi jenis, kondisi, dan detail material.' });
-        setLoading(false);
-        return;
-      }
-      if (!isEdit) saveDraft({ form: normalizedForm, photo });
-      const saved = saveResult({
-        form: normalizedForm,
-        photo,
-        result: data,
-        editId: editId || null,
-        uploadToken: newUploadToken(),
-      });
-      if (!saved) {
-        setNotice({ type: 'error', text: 'Hasil klasifikasi tidak dapat disimpan di browser. Coba lagi.' });
-        setLoading(false);
-        return;
-      }
-      router.push('/upload-material/result');
-    } catch {
-      setNotice({ type: 'error', text: 'Koneksi bermasalah. Periksa jaringan Anda lalu coba lagi.' });
-      setLoading(false);
-    }
+  if (!form.name.trim()) {
+    found.name = 'Nama material wajib diisi';
   }
+
+  setErrors(found);
+
+  if (Object.keys(found).length > 0) {
+    setNotice({
+      type: 'error',
+      text: 'Periksa kembali data material yang wajib diisi.',
+    });
+    return;
+  }
+
+  if (isEdit) {
+    setNotice({
+      type: 'error',
+      text: 'Fitur edit material production belum tersedia.',
+    });
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    const saved = await saveMaterial({
+      nama: form.name.trim(),
+      jenis_material: aiResult?.category || 'Belum diklasifikasikan',
+      kategori: aiResult?.category || 'Belum diklasifikasikan',
+      kategori_ai: aiResult?.category || null,
+      deskripsi: form.description.trim(),
+      jumlah: Number(form.quantity),
+      harga: Number(form.price),
+      satuan: form.satuan || 'kg',
+      lokasi: form.location.trim(),
+      kondisi_seller: form.condition.trim(),
+      foto: photo.dataUrl,
+      upload_token: newUploadToken(),
+    });
+
+    if (!saved?.ok || !saved?.id) {
+      throw new Error('Material gagal disimpan.');
+    }
+
+    clearDraft();
+    clearResult();
+
+    setFlash({
+      type: 'ok',
+      text: 'Material berhasil diterbitkan!',
+      note: saved.persisted
+        ? 'Material berhasil tersimpan di database.'
+        : 'Material tersimpan dalam mode demo.',
+    });
+
+    router.push('/my-materials');
+  } catch (error) {
+    console.error('UPLOAD MATERIAL ERROR:', error);
+
+    setNotice({
+      type: 'error',
+      text: error.message || 'Gagal menyimpan material.',
+    });
+  } finally {
+    setLoading(false);
+  }
+}
 
   const Alert = notice?.type === 'success' ? CircleCheck : notice?.type === 'warning' ? TriangleAlert : CircleAlert;
 
@@ -555,24 +592,24 @@ function UploadMaterialForm() {
               {errors.location && <p className="mt-1 text-[13px] text-red-600">{errors.location}</p>}
             </div>
 
-            <div className="mt-8 flex items-center justify-between border-t border-circlo-line pt-6">
-              <button type="button" onClick={onSave} disabled={saving} className="flex items-center gap-2 px-4 py-2 text-[14px] font-medium text-circlo-ink/80 hover:text-circlo-green disabled:opacity-60">
-                {saving && <LoaderCircle className="h-4 w-4 animate-spin" />}
-                Save
-              </button>
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex items-center gap-2 rounded-lg bg-circlo-green px-7 py-3 text-[14px] font-medium text-white transition hover:brightness-110 disabled:opacity-70"
-              >
-                {loading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                {loading ? 'Menganalisis...' : 'Submit'}
-              </button>
-            </div>
-          </form>
+            <div className="mt-8 flex justify-end border-t border-circlo-line pt-6">
+  <button
+    type="submit"
+    disabled={loading || saving}
+    className="flex items-center gap-2 rounded-lg bg-circlo-green px-7 py-3 text-[14px] font-medium text-white transition hover:brightness-110 disabled:opacity-70"
+  >
+    {loading || saving ? (
+      <LoaderCircle className="h-4 w-4 animate-spin" />
+    ) : (
+      <Sparkles className="h-4 w-4" />
+    )}
+    {loading || saving ? 'Menerbitkan material...' : 'Submit'}
+  </button>
+</div>
+</form>
 
-          {/* Kolom kanan */}
-          <aside className="space-y-5">
+{/* Kolom kanan */}
+<aside className="space-y-5">
             <div className="relative overflow-hidden rounded-xl border border-circlo-line bg-gradient-to-br from-[#E6F3FB] to-white px-6 pb-5 pt-6 shadow-card">
               <svg aria-hidden className="absolute -right-6 -top-6 h-24 w-24 text-circlo-lime/15" viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="9">
                 <path d="M85 30 A38 38 0 1 0 60 88" strokeLinecap="round" />
