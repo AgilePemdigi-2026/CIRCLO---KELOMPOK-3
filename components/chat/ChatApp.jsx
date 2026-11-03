@@ -79,9 +79,11 @@ export default function ChatApp() {
       const params = new URLSearchParams(window.location.search);
       let wanted = params.get('c');
       const materialId = params.get('material');
-      if (!wanted && materialId && role === 'buyer') {
+      const buyerId = params.get('buyer');
+      const target = role === 'buyer' ? (materialId ? { id_material: materialId } : null) : buyerId ? { id_buyer: buyerId, id_material: materialId } : null;
+      if (!wanted && target) {
         try {
-          wanted = (await openConversation({ id_material: materialId }, role)).id;
+          wanted = (await openConversation(target, role)).id;
         } catch (e) {
           if (!cancelled) setList((p) => ({ ...p, error: onApiError(e) }));
         }
@@ -144,9 +146,9 @@ export default function ChatApp() {
   if (needsLogin) {
     return (
       <main className="mx-auto max-w-[480px] px-4 py-24 text-center">
-        <h1 className="font-display text-[22px] font-semibold">Sesi login tidak ditemukan</h1>
-        <p className="mt-2 text-[15px] text-circlo-muted">Masuk dulu untuk membuka chat.</p>
-        <Link href={LOGIN_PATH} className="mt-6 inline-block rounded-lg bg-circlo-green px-7 py-3 text-[14px] font-medium text-white">Masuk</Link>
+        <h1 className="font-display text-[24px] font-semibold">Sesi login tidak ditemukan</h1>
+        <p className="mt-2 text-[17px] text-circlo-muted">Masuk dulu untuk membuka chat.</p>
+        <Link href={LOGIN_PATH} className="mt-6 inline-block rounded-lg bg-circlo-green px-7 py-3 text-[16px] font-medium text-white">Masuk</Link>
       </main>
     );
   }

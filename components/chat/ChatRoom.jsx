@@ -14,17 +14,17 @@ function MaterialCard({ material }) {
       <div className="flex items-center gap-4 rounded-lg bg-white p-3 shadow-card">
         {material.foto_url ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={material.foto_url} alt={material.nama} className="h-14 w-14 shrink-0 rounded-md object-cover" />
+          <img src={material.foto_url} alt={material.nama} className="h-[72px] w-[72px] shrink-0 rounded-md object-cover" />
         ) : (
-          <span className="h-14 w-14 shrink-0 rounded-md bg-circlo-soft" aria-hidden="true" />
+          <span className="h-[72px] w-[72px] shrink-0 rounded-md bg-circlo-soft" aria-hidden="true" />
         )}
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[15px] font-semibold text-circlo-ink">{material.nama}</p>
-          <p className="mt-0.5 text-[12.5px] font-semibold text-circlo-ink/80">{material.subtitle}</p>
-          <Link href={material.href} className="mt-0.5 inline-block text-[12.5px] text-circlo-green hover:underline">Lihat Material Details</Link>
+          <p className="truncate text-[16px] font-semibold text-circlo-ink">{material.nama}</p>
+          <p className="mt-0.5 text-[14px] font-semibold text-circlo-ink/80">{material.subtitle}</p>
+          <Link href={material.href} className="mt-0.5 inline-block text-[14px] text-circlo-green hover:underline">Lihat Material Details</Link>
         </div>
         <span
-          className={`self-start rounded-full px-3 py-1 text-[10.5px] font-bold tracking-wide ${
+          className={`self-start rounded-full px-3 py-1 text-[12px] font-bold tracking-wide ${
             material.available ? 'bg-[#DDE79A] text-circlo-green' : 'bg-circlo-field text-circlo-muted'
           }`}
         >
@@ -44,10 +44,10 @@ function Bubble({ m, other, showAvatar, onRetry }) {
       : 'bg-[#D7E5EC] text-circlo-ink rounded-bl-md';
   return (
     <div className={`flex items-end gap-2 ${m.mine ? 'justify-end' : ''}`}>
-      {!m.mine && <span className="w-7 shrink-0">{showAvatar && <Avatar name={other.name} src={other.avatar_url} size={28} />}</span>}
-      <div className={`max-w-[80%] rounded-2xl px-4 py-3 lg:max-w-[72%] ${tone}`}>
-        <p className="whitespace-pre-wrap break-words text-[15px] leading-6">{m.text}</p>
-        <div className={`mt-1 flex items-center justify-end gap-2 text-[11px] ${m.mine && !failed ? 'text-white/70' : 'text-circlo-muted'}`}>
+      {!m.mine && <span className="w-9 shrink-0">{showAvatar && <Avatar name={other.name} src={other.avatar_url} size={36} />}</span>}
+      <div className={`max-w-[80%] rounded-2xl px-5 py-4 lg:max-w-[80%] ${tone}`}>
+        <p className="whitespace-pre-wrap break-words text-[17px] leading-relaxed">{m.text}</p>
+        <div className={`mt-1 flex items-center justify-end gap-2 text-[12.5px] ${m.mine && !failed ? 'text-white/70' : 'text-circlo-muted'}`}>
           {m.status === 'sending' && <span>Mengirim…</span>}
           {failed && (
             <>
@@ -75,7 +75,7 @@ export default function ChatRoom({ conversation, messages, loading, error, onSen
   if (!conversation) {
     return (
       <section aria-label="Ruang Percakapan" className={`flex-1 flex-col items-center justify-center bg-circlo-bg p-8 text-center ${className}`}>
-        {loading ? <p className="text-[14px] text-circlo-muted">Memuat…</p> : <p className="text-[14px] text-circlo-muted">{error || 'Pilih percakapan di sebelah kiri untuk mulai mengobrol.'}</p>}
+        {loading ? <p className="text-[16px] text-circlo-muted">Memuat…</p> : <p className="text-[16px] text-circlo-muted">{error || 'Pilih percakapan di sebelah kiri untuk mulai mengobrol.'}</p>}
       </section>
     );
   }
@@ -91,18 +91,20 @@ export default function ChatRoom({ conversation, messages, loading, error, onSen
 
   return (
     <section aria-label="Ruang Percakapan" className={`min-w-0 flex-1 flex-col bg-circlo-bg ${className}`}>
-      <button type="button" onClick={onBack} className="flex items-center gap-2 border-b border-circlo-line/70 px-4 py-3 text-[14px] font-medium text-circlo-green lg:hidden">
+      <h2 className="sr-only">Ruang Percakapan</h2>
+      <button type="button" onClick={onBack} className="flex items-center gap-2 border-b border-circlo-line/70 px-4 py-3 text-[16px] font-medium text-circlo-green lg:hidden">
         <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Daftar Percakapan
       </button>
       {conversation.material && <MaterialCard material={conversation.material} />}
 
       <div ref={logRef} role="log" aria-label="Riwayat Pesan" aria-live="polite" className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-5 sm:px-8">
-        {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-center text-[13px] text-red-700">{error}</p>}
-        {!messages.length && !loading && <p className="pt-8 text-center text-[14px] text-circlo-muted">Belum ada pesan. Tulis pesan pertamamu.</p>}
+        {messages.length > 0 && <h3 className="sr-only">Riwayat Pesan</h3>}
+        {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-center text-[15px] text-red-700">{error}</p>}
+        {!messages.length && !loading && <p className="pt-8 text-center text-[16px] text-circlo-muted">Belum ada pesan. Tulis pesan pertamamu.</p>}
         {groups.map((g) => (
           <div key={g.key} className="space-y-3">
             <div className="flex justify-center">
-              <span className="rounded-full bg-[#D7E5EC] px-3 py-1 text-[12px] text-circlo-ink/80">{g.label}</span>
+              <span className="rounded-full bg-[#D7E5EC] px-3 py-1 text-[13.5px] text-circlo-ink/80">{g.label}</span>
             </div>
             {g.items.map((m, i) => (
               <Bubble key={m.key} m={m} other={conversation} showAvatar={i === 0 || g.items[i - 1].mine} onRetry={onRetry} />
@@ -125,7 +127,7 @@ export default function ChatRoom({ conversation, messages, loading, error, onSen
             aria-label="Ketik pesan"
             autoComplete="off"
             maxLength={MAX}
-            className="min-w-0 flex-1 bg-transparent py-1.5 text-[15px] text-circlo-ink outline-none placeholder:text-[#747B78]"
+            className="min-w-0 flex-1 bg-transparent py-1.5 text-[17px] text-circlo-ink outline-none placeholder:text-[#747B78]"
           />
           <button
             type="submit"
@@ -134,9 +136,9 @@ export default function ChatRoom({ conversation, messages, loading, error, onSen
             aria-label="Kirim"
             title="Kirim"
             disabled={!text.trim()}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-circlo-green text-white transition disabled:opacity-60"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-circlo-green text-white transition disabled:opacity-60"
           >
-            <Send className="h-4 w-4" aria-hidden="true" />
+            <Send className="h-[18px] w-[18px]" fill="currentColor" aria-hidden="true" />
           </button>
         </div>
       </form>

@@ -336,6 +336,10 @@ export default function OrderDetailPage() {
   const lokasiQuery = data
     ? [data.lokasi.alamat, data.lokasi.kota, data.lokasi.provinsi].filter(Boolean).join(', ')
     : '';
+  // Tombol "Hubungi Seller" membuka chat dengan seller material pesanan ini.
+  const chatMaterial = data?.items?.[0]?.id_material;
+  const chatHref = chatMaterial ? `/chat?material=${chatMaterial}` : '/chat';
+
   const sellerMeta = data?.seller
     ? [data.seller.terverifikasi ? 'Penjual Terverifikasi' : 'Penjual', data.seller.rating ? `Rating ${data.seller.rating}%` : null]
         .filter(Boolean)
@@ -572,7 +576,7 @@ export default function OrderDetailPage() {
                   <p className="mt-3 text-[15px] font-semibold text-circlo-ink">{data.seller?.nama || 'Penjual'}</p>
                   <p className="mt-0.5 text-[12.5px] text-circlo-ink/80">{sellerMeta}</p>
                   <Link
-                    href="/chat"
+                    href={chatHref}
                     className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-[#8A5200] px-4 py-3 text-[14px] font-medium text-white hover:brightness-110"
                   >
                     <MessageSquareText className="h-4 w-4" /> Hubungi Seller
