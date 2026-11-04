@@ -9,7 +9,9 @@ import { roleFromUser } from "@/lib/roles";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "meta-llama/llama-3.1-8b-instruct:free";
 const KATEGORI = ["Spanduk", "Plastik", "Tekstil", "Kulit", "Kayu", "Logam", "Kaca", "Karet", "Organik", "Kertas", "Lainnya"];
 const SATUAN = ["kg", "m2", "pcs"];
 const IMAGE_MIME = ["image/jpeg", "image/png", "image/webp"];
@@ -53,7 +55,23 @@ Aturan:
 7. Jika foto tidak jelas atau tidak sesuai dengan data seller, isi "confidence" dengan "rendah" dan jelaskan di "perlu_konfirmasi".
 8. Jika seller sudah menulis nama atau kondisi, pertahankan maknanya; rapikan saja bahasanya.
 9. Berikan peringatan keselamatan di "buyer_notes" bila material berisiko (kaca pecah, logam tajam, bekas bahan kimia, dll).
-Keluarkan HANYA JSON sesuai skema.`;
+
+Keluarkan HANYA JSON valid tanpa teks pembuka, penutup, atau blok kode Markdown, dengan struktur:
+{
+  "name": "nama singkat material",
+  "description": "deskripsi 2-4 kalimat",
+  "condition": "kondisi material",
+  "category": "salah satu dari: Spanduk, Plastik, Tekstil, Kulit, Kayu, Logam, Kaca, Karet, Organik, Kertas, Lainnya",
+  "subcategory": "subkategori material",
+  "composition": "komposisi bila diketahui",
+  "specifications": [{ "label": "nama atribut", "value": "nilai atribut" }],
+  "potential_uses": ["potensi pemanfaatan"],
+  "buyer_notes": ["catatan untuk buyer"],
+  "tags": ["tag"],
+  "satuan_saran": "kg atau m2 atau pcs",
+  "perlu_konfirmasi": ["hal yang perlu dikonfirmasi seller"],
+  "confidence": "tinggi atau sedang atau rendah"
+}`;
 
 const RESPONSE_SCHEMA = {
   type: "OBJECT",
@@ -115,12 +133,68 @@ function buildUserText(body) {
   return `Data dari seller:\n${rows.map(([k, v]) => `- ${k}: ${v}`).join("\n") || "- (belum ada isian)"}\n\nAnalisis FOTO terlampir dan tulis hasilnya sesuai skema.`;
 }
 
-// ---------- Panggil Gemini ----------
+// Ambil teks dari respons model yang mungkin berupa string atau array part
+function extractText(content) {
+  if (typeof content === "string") return content.trim();
+  if (Array.isArray(content)) return content.map((p) => (typeof p === "string" ? p : p?.text || "")).join("").trim();
+  return "";
+}
+
+// ---------- Panggil OpenRouter (vision) ----------
+async function callOpenRouter(apiKey, userText, image) {
+  let res;
+  try {
+    res = await fetch(OPENROUTER_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "X-Title": "CIRCLO",
+        "HTTP-Referer": process.env.APP_URL || "http://localhost:3000",
+      },
+      body: JSON.stringify({
+        model: OPENROUTER_MODEL,
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: userText },
+              { type: "image_url", image_url: { url: `data:${image.mime};base64,${image.data}` } },
+            ],
+          },
+        ],
+        temperature: 0.3,
+        max_tokens: 4096,
+      }),
+      signal: AbortSignal.timeout(45000),
+    });
+  } catch (err) {
+    if (err?.name === "TimeoutError") throw new AiError("AI belum merespons. Coba lagi sebentar.", 504);
+    throw new AiError("Layanan AI tidak dapat dihubungi.", 502);
+  }
+
+  if (res.status === 429) throw new AiError("Layanan AI sedang sibuk. Coba lagi beberapa saat lagi.", 429);
+  if (res.status === 400 || res.status === 401 || res.status === 403) {
+    const detail = await res.json().catch(() => ({}));
+    console.error("classify-material: OpenRouter menolak permintaan:", detail?.error?.message || res.status);
+    throw new AiError("Layanan AI menolak permintaan. Periksa konfigurasi key dan model di server.", 502);
+  }
+  if (!res.ok) throw new AiError("Layanan AI mengalami gangguan. Coba lagi.", 502);
+
+  const data = await res.json().catch(() => ({}));
+  const choice = data?.choices?.[0];
+  const text = extractText(choice?.message?.content);
+  if (!text) throw new AiError("AI tidak mengembalikan hasil. Coba lagi.", 502);
+  return text;
+}
+
+// ---------- Panggil Gemini (cadangan) ----------
 async function callGemini(apiKey, userText, image) {
   const parts = [{ text: userText }, { inlineData: { mimeType: image.mime, data: image.data } }];
   let res;
   try {
-    res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(MODEL)}:generateContent`, {
+    res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify({
@@ -143,7 +217,7 @@ async function callGemini(apiKey, userText, image) {
   if (res.status === 429) throw new AiError("Layanan AI sedang sibuk. Coba lagi beberapa saat lagi.", 429);
   if (res.status === 400 || res.status === 403) {
     const detail = await res.json().catch(() => ({}));
-    console.error("generate-description: Gemini menolak permintaan:", detail?.error?.message || res.status);
+    console.error("classify-material: Gemini menolak permintaan:", detail?.error?.message || res.status);
     throw new AiError("Layanan AI menolak permintaan. Periksa konfigurasi key dan model di server.", 502);
   }
   if (!res.ok) throw new AiError("Layanan AI mengalami gangguan. Coba lagi.", 502);
@@ -158,14 +232,28 @@ async function callGemini(apiKey, userText, image) {
   return text;
 }
 
+// Ambil objek JSON dari keluaran model, termasuk bila terbungkus teks/Markdown
+function parseAiJson(rawText) {
+  const text = String(rawText || "").trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+  const candidates = [text];
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start >= 0 && end > start) candidates.push(text.slice(start, end + 1));
+  for (const candidate of candidates) {
+    try {
+      const obj = JSON.parse(candidate);
+      if (obj && typeof obj === "object" && !Array.isArray(obj)) return obj;
+    } catch {
+      // coba kandidat berikutnya
+    }
+  }
+  return null;
+}
+
 // Rapikan & validasi keluaran model; lempar AiError bila tidak layak dipakai
 function normalize(rawText, body) {
-  let obj;
-  try {
-    obj = JSON.parse(rawText.replace(/^```(?:json)?\s*|\s*```$/g, ""));
-  } catch {
-    throw new AiError("Hasil AI tidak terbaca. Coba lagi.", 502);
-  }
+  const obj = parseAiJson(rawText);
+  if (!obj) throw new AiError("Hasil AI tidak terbaca. Coba lagi.", 502);
 
   const description = str(obj.description, 1200);
   if (description.length < 20) throw new AiError("AI belum menghasilkan deskripsi yang layak. Coba lagi.", 502);
@@ -214,8 +302,15 @@ export async function POST(request) {
   const denied = await requireSeller(request);
   if (denied) return denied;
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return deny(500, "GEMINI_API_KEY belum diatur di server.");
+  // OpenRouter didahulukan karena mendukung model vision; Gemini dipakai bila tersedia.
+  const providers = [];
+  if (process.env.OPENROUTER_API_KEY) {
+    providers.push(["openrouter", (text, img) => callOpenRouter(process.env.OPENROUTER_API_KEY, text, img)]);
+  }
+  if (process.env.GEMINI_API_KEY) {
+    providers.push(["gemini", (text, img) => callGemini(process.env.GEMINI_API_KEY, text, img)]);
+  }
+  if (!providers.length) return deny(500, "Belum ada API key AI yang diatur di server (OPENROUTER_API_KEY atau GEMINI_API_KEY).");
 
   let body;
   try {
@@ -234,14 +329,17 @@ export async function POST(request) {
   const userText = buildUserText(body);
   let lastError = new AiError("Gagal membuat deskripsi dengan AI.", 502);
 
-  for (let attempt = 0; attempt < 2; attempt++) {   // coba ulang sekali bila JSON rusak/deskripsi kosong
-    try {
-      const raw = await callGemini(apiKey, userText, image);
-      return NextResponse.json(normalize(raw, body));
-    } catch (err) {
-      lastError = err instanceof AiError ? err : new AiError("Gagal membuat deskripsi dengan AI.", 502);
-      const retryable = lastError.status === 502 && /tidak terbaca|belum menghasilkan|tidak mengembalikan/.test(lastError.message);
-      if (!retryable) break;
+  for (const [source, call] of providers) {
+    for (let attempt = 0; attempt < 2; attempt++) {   // coba ulang sekali bila JSON rusak/deskripsi kosong
+      try {
+        const raw = await call(userText, image);
+        return NextResponse.json(normalize(raw, body));
+      } catch (err) {
+        lastError = err instanceof AiError ? err : new AiError("Gagal membuat deskripsi dengan AI.", 502);
+        console.error(`classify-material: ${source} gagal:`, lastError.message);
+        const retryable = lastError.status === 502 && /tidak terbaca|belum menghasilkan|tidak mengembalikan/.test(lastError.message);
+        if (!retryable) break; // lanjut ke provider berikutnya
+      }
     }
   }
   // Tidak pernah mengembalikan struktur kosong dengan status 200

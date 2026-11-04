@@ -272,76 +272,66 @@ function UploadMaterialForm() {
   }
 
   // "Bantu dengan AI": kirim FOTO + isian ke server, isi deskripsi (dan nama/kondisi bila masih kosong)
-  
-      
-async function onGenerateDescription() {
-  setAiError('');
+  async function onGenerateDescription() {
+    setAiError('');
 
-  if (!photo) {
-    setAiError('Unggah foto material dulu supaya analisis dapat dilakukan.');
-    return;
+    if (!photo) {
+      setAiError('Unggah foto material dulu supaya analisis dapat dilakukan.');
+      return;
+    }
+
+    if (!isDataUrl(photo.dataUrl)) {
+      setAiError('Unggah ulang foto material terlebih dahulu.');
+      return;
+    }
+
+    if (!form.name.trim() && form.description.trim().length < 3) {
+      setAiError('Isi nama material atau deskripsi singkat dulu.');
+      return;
+    }
+
+    setIsGenerating(true);
+
+    try {
+      const headers = { 'Content-Type': 'application/json' };
+      const token = await getAccessToken().catch(() => null);
+      if (token) headers.Authorization = `Bearer ${token}`;
+
+      const res = await fetch('/api/classify-material', {
+        method: 'POST',
+        headers,
+        cache: 'no-store',
+        body: JSON.stringify({
+          image: photo.dataUrl,
+          name: form.name,
+          description: form.description,
+          condition: form.condition,
+          quantity: form.quantity,
+          price: form.price,
+          satuan: form.satuan,
+          location: form.location,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'AI gagal menganalisis material.');
+
+      setAiResult(data);
+      const nextForm = {
+        ...form,
+        name: form.name.trim() ? form.name : data.name || form.name,
+        description: data.description || form.description,
+        condition: form.condition.trim() ? form.condition : data.condition || form.condition,
+        satuan: form.satuan || data.satuan_saran || form.satuan,
+      };
+      setForm(nextForm);
+      saveResult({ form: nextForm, photo, result: data, editId: editId || null, uploadToken: newUploadToken() });
+    } catch (error) {
+      setAiError(error.message || 'Gagal membuat deskripsi dengan AI.');
+    } finally {
+      setIsGenerating(false);
+    }
   }
-
-  if (!isDataUrl(photo.dataUrl)) {
-    setAiError('Unggah ulang foto material terlebih dahulu.');
-    return;
-  }
-
-  if (!form.name.trim() && form.description.trim().length < 3) {
-    setAiError('Isi nama material atau deskripsi singkat dulu.');
-    return;
-  }
-
-  setIsGenerating(true);
-
-  try {
-    const demoResult = {
-      name: form.name.trim() || 'Sisa kain katun hitam',
-      description: form.description.trim() || 'Sisa kain katun berwarna hitam dalam kondisi kering.',
-      condition: form.condition || 'Kering',
-      category: 'Tekstil',
-      subcategory: 'Kain Katun',
-      composition: 'Katun (belum terverifikasi secara fisik)',
-      specifications: [
-        { label: 'Jenis Material', value: 'Sisa kain katun' },
-        { label: 'Warna', value: 'Hitam' },
-        { label: 'Kondisi Fisik', value: form.condition || 'Kering' },
-        { label: 'Jumlah Tersedia', value: `${form.quantity || 236} ${form.satuan || 'm2'}` },
-      ],
-      potential_uses: [
-        'Patchwork dan quilting untuk produk tekstil.',
-        'Kerajinan tangan seperti pouch, tote bag, dan dompet.',
-        'Bahan tambahan untuk produk fashion dan aksesori.',
-        'Upcycling tekstil menjadi produk baru bernilai guna.',
-      ],
-      buyer_notes: [
-        'Pastikan ukuran potongan kain sesuai kebutuhan produksi.',
-        'Periksa kebersihan, ketebalan, dan kekuatan serat kain.',
-        'Konfirmasikan komposisi katun kepada Seller sebelum pembelian.',
-        `Harga yang ditawarkan adalah Rp${Number(form.price || 3000).toLocaleString('id-ID')} per ${form.satuan || 'm2'}.`,
-      ],
-      tags: [
-        'Tekstil',
-        'KainKatun',
-        'KainHitam',
-        'SisaKain',
-        'Upcycling',
-        'BahanKerajinan',
-      ],
-      confidence: 'tinggi',
-    };
-
-    setAiResult(demoResult);
-    setForm((prev) => ({
-      ...prev,
-      description: demoResult.description,
-    }));
-  } catch (error) {
-    setAiError('Gagal menampilkan hasil analisis demo.');
-  } finally {
-    setIsGenerating(false);
-  }
-}
 
 
   async function onSubmit(e) {
