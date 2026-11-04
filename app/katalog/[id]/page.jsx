@@ -229,7 +229,7 @@ if (m.id_seller != null) {
 
               {/* Tombol Kunjungi Toko */}
               <Link
-                href={`/toko/${seller.id_seller}`}
+                href={`/toko/${seller.id_seller}?from=${m.id_material}`}
                 className="inline-flex items-center justify-center rounded-lg border border-[#3f6a0b] px-5 py-3 text-sm font-semibold text-[#3f6a0b] transition hover:bg-green-50"
               >
                 Kunjungi Toko
