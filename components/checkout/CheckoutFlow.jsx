@@ -10,6 +10,7 @@ import AlamatPengirimanStep, {
   validateAlamat,
 } from "./AlamatPengirimanStep";
 import PembayaranStep from "./PembayaranStep";
+import { Check } from "lucide-react";
 
 const steps = ["Jumlah Pesanan", "Alamat", "Pembayaran"];
 
@@ -271,22 +272,60 @@ export default function CheckoutFlow() {
     <div className="mt-8 grid gap-6 lg:grid-cols-[2fr_1fr]">
       {/* BAGIAN KIRI */}
       <section className="rounded-2xl bg-white p-6 shadow-card sm:p-8">
-        {/* Indikator langkah */}
-        <div className="mb-8 flex flex-wrap gap-3">
-          {steps.map((nama, index) => (
-            <div
-              key={nama}
-              className={`rounded-full px-4 py-2 text-sm ${
-                step === index
-                  ? "bg-circlo-green text-white"
-                  : index < step
-                  ? "bg-green-100 text-green-800"
-                  : "bg-circlo-field text-circlo-muted"
-              }`}
-            >
-              {index + 1}. {nama}
-            </div>
-          ))}
+        {/* Progress Bar Minimalist */}
+        <div className="mb-8">
+          <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
+            {steps.map((nama, index) => {
+              const isCompleted = index < step;
+              const isCurrent = index === step;
+
+              return (
+                <button
+                  key={nama}
+                  type="button"
+                  onClick={() => {
+                    if (isCompleted) {
+                      setError("");
+                      setStep(index);
+                    }
+                  }}
+                  disabled={!isCompleted}
+                  className={`group flex flex-col items-start text-left transition-all ${
+                    isCompleted ? "cursor-pointer" : "cursor-default"
+                  }`}
+                  aria-current={isCurrent ? "step" : undefined}
+                >
+                  {/* Progress Line Bar */}
+                  <div
+                    className={`h-1.5 w-full rounded-full transition-all duration-300 ${
+                      isCompleted || isCurrent
+                        ? "bg-circlo-green"
+                        : "bg-circlo-line/50"
+                    }`}
+                  />
+
+                  {/* Step Label */}
+                  <div className="mt-2.5 flex items-center gap-1.5 text-xs sm:text-[13px]">
+                    <span
+                      className={`transition-colors leading-tight ${
+                        isCurrent
+                          ? "font-semibold text-circlo-green"
+                          : isCompleted
+                          ? "font-medium text-circlo-ink group-hover:text-circlo-green"
+                          : "text-circlo-muted/60"
+                      }`}
+                    >
+                      <span className="inline">{index + 1}. </span>
+                      {nama}
+                    </span>
+                    {isCompleted && (
+                      <Check className="h-3.5 w-3.5 text-circlo-green shrink-0" />
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {!material && (
