@@ -1,13 +1,15 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   UserRound,
   Mail,
   Phone,
+  MapPin,
+  Camera,
   CalendarDays,
   ShieldCheck,
   Pencil,
@@ -27,7 +29,7 @@ import {
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import RoleGate from "@/components/RoleGate";
-import { LOGIN_PATH, useRole } from "@/lib/auth";
+import { LOGIN_PATH, useRole, getAccessToken } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { ROLE_LABEL, profileFromUser } from "@/lib/roles";
 import { clearDraft, clearResult } from "@/lib/storage";
@@ -64,6 +66,15 @@ function getInitials(name) {
   ).toUpperCase();
 }
 
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error("Gagal membaca file gambar."));
+    reader.readAsDataURL(file);
+  });
+}
+
 function InfoItem({ icon: Icon, label, value }) {
   return (
     <div className="flex items-start gap-4 border-b border-[#edf1e9] py-5 last:border-0">
@@ -90,12 +101,16 @@ function ProfileContent() {
   const [user, setUser] = useState(null);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [message, setMessage] = useState(null);
+  const fileInputRef = useRef(null);
 
   const [form, setForm] = useState({
     fullName: "",
     phone: "",
+    address: "",
+    avatarDataUrl: "",
   });
 
   useEffect(() => {
@@ -125,6 +140,8 @@ function ProfileContent() {
     setForm({
       fullName: profile.hasName ? profile.fullName : "",
       phone: profile.phone || "",
+      address: profile.address || "",
+      avatarDataUrl: "",
     });
 
     setMessage(null);
@@ -165,21 +182,36 @@ function ProfileContent() {
     setMessage(null);
 
     try {
-      const { data, error } = await supabase.auth.updateUser({
-        data: {
-          ...user.user_metadata,
-          full_name: name,
-          phone,
+      const token = await getAccessToken();
+      if (!token) {
+        throw new Error("Sesi login tidak valid. Silakan login ulang.");
+      }
+
+      const res = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
+        body: JSON.stringify({
+          fullName: name,
+          phone,
+          address: form.address.trim(),
+        }),
       });
 
-      if (error) throw error;
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(data?.error || "Gagal menyimpan profil.");
+      }
 
       if (!data?.user) {
         throw new Error("Profil terbaru tidak ditemukan.");
       }
 
       setUser(data.user);
+      setForm((prev) => ({ ...prev, avatarDataUrl: "" }));
       setEditing(false);
 
       setMessage({
@@ -193,6 +225,74 @@ function ProfileContent() {
       });
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleAvatarChange(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+
+    if (!file) return;
+
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
+      setMessage({
+        type: "error",
+        text: "Foto profil harus berupa JPG, PNG, atau WebP.",
+      });
+      return;
+    }
+
+    if (file.size > 4 * 1024 * 1024) {
+      setMessage({
+        type: "error",
+        text: "Ukuran foto maksimal 4 MB.",
+      });
+      return;
+    }
+
+    setUploadingAvatar(true);
+    setMessage(null);
+
+    try {
+      const avatarDataUrl = await readFileAsDataUrl(file);
+      const token = await getAccessToken();
+
+      if (!token) {
+        throw new Error("Sesi login tidak valid. Silakan login ulang.");
+      }
+
+      const res = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ avatarDataUrl }),
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(data?.error || "Gagal mengunggah foto profil.");
+      }
+
+      if (!data?.user) {
+        throw new Error("Profil terbaru tidak ditemukan.");
+      }
+
+      setUser(data.user);
+
+      setMessage({
+        type: "success",
+        text: "Foto profil berhasil diperbarui!",
+      });
+    } catch (err) {
+      setMessage({
+        type: "error",
+        text: err.message || "Gagal mengunggah foto profil.",
+      });
+    } finally {
+      setUploadingAvatar(false);
     }
   }
 
@@ -275,8 +375,46 @@ function ProfileContent() {
 
           <div className="relative z-10 flex flex-col items-start gap-5 sm:flex-row sm:items-center">
 
-            <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full border-4 border-white/30 bg-[#e3f1cf] text-3xl font-bold text-[#315d20] shadow-lg">
-              {getInitials(fullName)}
+            <div className="relative shrink-0">
+              <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-4 border-white/30 bg-[#e3f1cf] text-3xl font-bold text-[#315d20] shadow-lg">
+                {profile.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={profile.avatarUrl}
+                    alt={`Foto profil ${fullName}`}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  getInitials(fullName)
+                )}
+              </div>
+
+              {canEdit && (
+                <>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={handleAvatarChange}
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingAvatar}
+                    aria-label="Ganti foto profil"
+                    title="Ganti foto profil"
+                    className="absolute -bottom-1 -right-1 flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-[#467814] text-white shadow-md transition hover:bg-[#345d0d] disabled:opacity-60"
+                  >
+                    {uploadingAvatar ? (
+                      <LoaderCircle size={16} className="animate-spin" />
+                    ) : (
+                      <Camera size={16} />
+                    )}
+                  </button>
+                </>
+              )}
             </div>
 
             <div className="min-w-0 flex-1">
@@ -485,6 +623,29 @@ function ProfileContent() {
                   />
                 </div>
 
+                <div>
+                  <label
+                    htmlFor="address"
+                    className="mb-2 block text-sm font-semibold text-[#354638]"
+                  >
+                    Alamat
+                  </label>
+
+                  <textarea
+                    id="address"
+                    rows={3}
+                    value={form.address}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        address: e.target.value,
+                      }))
+                    }
+                    placeholder="Masukkan alamat lengkap (jalan, kota, kode pos)"
+                    className={`${inputClass} resize-none`}
+                  />
+                </div>
+
                 <div className="flex flex-wrap justify-end gap-3 border-t border-[#edf1e9] pt-6">
                   <button
                     type="button"
@@ -534,6 +695,12 @@ function ProfileContent() {
                   icon={Phone}
                   label="Nomor HP"
                   value={profile.phone}
+                />
+
+                <InfoItem
+                  icon={MapPin}
+                  label="Alamat"
+                  value={profile.address}
                 />
 
                 <InfoItem
