@@ -66,6 +66,11 @@ export default function MaterialOrderPanel({ material }) {
     },
   };
 
+  // Arahkan Buyer ke halaman Chat dengan konteks material yang dipilih.
+  const chatHref = material?.id_material != null
+    ? `/chat?material=${encodeURIComponent(String(material.id_material))}`
+    : null;
+
   // Menutup popup menggunakan Escape
   useEffect(() => {
     if (!openCart || loadingCart) return;
@@ -202,16 +207,26 @@ export default function MaterialOrderPanel({ material }) {
     <div className="mt-6 space-y-3">
       {/* TIGA TOMBOL DETAIL MATERIAL */}
       <div className="grid grid-cols-3 gap-2 sm:gap-3">
-        {/* CHAT */}
-        <button
-          type="button"
-          disabled
-          title="Fitur chat toko akan segera tersedia"
-          className="flex items-center justify-center gap-2 rounded-lg border border-[#3f6a0b] bg-white px-2 py-3 text-xs font-semibold text-[#3f6a0b] opacity-60 sm:text-sm"
-        >
-          <MessageCircle size={18} />
-          Chat
-        </button>
+        {/* CHAT SELLER */}
+        {chatHref ? (
+          <Link
+            href={chatHref}
+            title="Chat dengan Seller tentang material ini"
+            className="flex items-center justify-center gap-2 rounded-lg border border-[#3f6a0b] bg-white px-2 py-3 text-xs font-semibold text-[#3f6a0b] transition hover:bg-green-50 sm:text-sm"
+          >
+            <MessageCircle size={18} />
+            Chat
+          </Link>
+        ) : (
+          <button
+            type="button"
+            disabled
+            className="flex items-center justify-center gap-2 rounded-lg border border-[#3f6a0b] bg-white px-2 py-3 text-xs font-semibold text-[#3f6a0b] opacity-50 sm:text-sm"
+          >
+            <MessageCircle size={18} />
+            Chat
+          </button>
+        )}
 
         {/* KERANJANG */}
         <button
