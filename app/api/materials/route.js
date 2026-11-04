@@ -485,6 +485,290 @@ export async function POST(req) {
 }
 
 // ===================================================
+// PATCH: UPDATE MATERIAL
+// ===================================================
+export async function PATCH(req) {
+  const admin = adminClient();
+
+  if (!admin) {
+    return NextResponse.json(
+      { error: 'Supabase belum dikonfigurasi di server.' },
+      { status: 500 }
+    );
+  }
+
+  const token = (
+    req.headers.get('authorization') || ''
+  ).replace(/^Bearer\s+/i, '');
+
+  if (!token) {
+    return NextResponse.json(
+      { error: 'Tidak ada sesi login.' },
+      { status: 401 }
+    );
+  }
+
+  const { data: userData, error: userError } =
+    await admin.auth.getUser(token);
+
+  if (userError || !userData?.user) {
+    return NextResponse.json(
+      { error: 'Sesi login tidak valid.' },
+      { status: 401 }
+    );
+  }
+
+  const user = userData.user;
+
+  if (roleFromUser(user) !== 'seller') {
+    return NextResponse.json(
+      {
+        error: 'Hanya Seller yang dapat mengubah material.',
+      },
+      { status: 403 }
+    );
+  }
+
+  let body;
+
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json(
+      { error: 'Request tidak valid.' },
+      { status: 400 }
+    );
+  }
+
+  const rawId = body.id || body.id_material;
+
+  if (!rawId) {
+    return invalid('ID material wajib disertakan.');
+  }
+
+  const idNumeric = Number(rawId);
+  const idMaterial = Number.isInteger(idNumeric) ? idNumeric : rawId;
+
+  let seller;
+
+  try {
+    seller = await sellerFor(admin, user);
+  } catch (err) {
+    return NextResponse.json(
+      { error: err.message },
+      { status: 500 }
+    );
+  }
+
+  // Cari material yang akan diubah
+  const { data: currentMaterial, error: currentError } = await admin
+    .from('material')
+    .select('*')
+    .eq('id_material', idMaterial)
+    .limit(1)
+    .maybeSingle();
+
+  if (currentError) {
+    return NextResponse.json(
+      { error: `Gagal membaca material: ${currentError.message}` },
+      { status: 500 }
+    );
+  }
+
+  if (!currentMaterial) {
+    return NextResponse.json(
+      { error: 'Material tidak ditemukan.' },
+      { status: 404 }
+    );
+  }
+
+  // Pastikan material milik seller yang sedang login
+  if (currentMaterial.id_seller !== seller.id_seller) {
+    return NextResponse.json(
+      { error: 'Anda tidak memiliki akses untuk mengubah material ini.' },
+      { status: 403 }
+    );
+  }
+
+  const nama =
+    body.nama !== undefined
+      ? String(body.nama).trim()
+      : body.nama_material !== undefined
+      ? String(body.nama_material).trim()
+      : currentMaterial.nama_material;
+
+  if (!nama) return invalid('Nama material wajib diisi.');
+
+  const jenis =
+    body.jenis_material !== undefined
+      ? String(body.jenis_material).trim()
+      : body.kategori !== undefined
+      ? String(body.kategori).trim()
+      : currentMaterial.kategori;
+
+  if (!jenis) return invalid('Jenis material belum terdeteksi.');
+
+  const deskripsi =
+    body.deskripsi !== undefined
+      ? String(body.deskripsi).trim()
+      : body.deskripsi_material !== undefined
+      ? String(body.deskripsi_material).trim()
+      : currentMaterial.deskripsi_material;
+
+  if (deskripsi.length < 5) {
+    return invalid('Deskripsi minimal 5 karakter.');
+  }
+
+  if (deskripsi.length > 2000) {
+    return invalid('Deskripsi maksimal 2000 karakter.');
+  }
+
+  const satuan =
+    body.satuan !== undefined
+      ? String(body.satuan).trim()
+      : currentMaterial.satuan || 'kg';
+
+  if (!SATUAN_VALID.includes(satuan)) {
+    return invalid('Satuan harus kg, m2, atau pcs.');
+  }
+
+  const lokasi =
+    body.lokasi !== undefined
+      ? String(body.lokasi).trim()
+      : currentMaterial.lokasi;
+
+  if (!lokasi) return invalid('Lokasi wajib diisi.');
+
+  const kondisiSeller =
+    body.kondisi_seller !== undefined
+      ? String(body.kondisi_seller).trim()
+      : body.kondisi !== undefined
+      ? String(body.kondisi).trim()
+      : currentMaterial.kondisi_seller;
+
+  if (!kondisiSeller) {
+    return invalid('Kondisi material wajib diisi.');
+  }
+
+  let stok = currentMaterial.stok;
+  if (body.jumlah !== undefined || body.stok !== undefined) {
+    stok = Number(body.jumlah ?? body.stok);
+    if (!Number.isInteger(stok) || stok <= 0) {
+      return invalid('Jumlah harus berupa angka bulat lebih dari 0.');
+    }
+  }
+
+  let harga = currentMaterial.harga;
+  if (body.harga !== undefined) {
+    harga = Number(body.harga);
+    if (
+      String(body.harga).trim() === '' ||
+      !Number.isFinite(harga) ||
+      harga < 0
+    ) {
+      return invalid('Harga harus berupa angka 0 atau lebih.');
+    }
+  }
+
+  let kategoriAi = currentMaterial.kategori_ai;
+  if (body.kategori_ai !== undefined) {
+    kategoriAi = String(body.kategori_ai || '').trim() || null;
+  }
+
+  let fotoUrl = currentMaterial.foto_url;
+
+  // Jika ada foto baru berupa data URL (base64)
+  if (body.foto && typeof body.foto === 'string' && body.foto.startsWith('data:')) {
+    const photo = parsePhoto(body.foto);
+
+    if (photo.error) return invalid(photo.error);
+
+    const bucketError = await ensurePhotoBucket(admin);
+
+    if (bucketError) {
+      return NextResponse.json(
+        { error: bucketError },
+        { status: 500 }
+      );
+    }
+
+    const fileToken = crypto.randomUUID();
+    const photoPath = `${seller.id_seller}/${idMaterial}-${fileToken}.${photo.ext}`;
+
+    const uploaded = await admin.storage
+      .from(BUCKET)
+      .upload(photoPath, photo.buffer, {
+        contentType: photo.mime,
+        upsert: true,
+      });
+
+    if (uploaded.error) {
+      return NextResponse.json(
+        {
+          error: `Gagal menyimpan foto: ${uploaded.error.message}`,
+        },
+        { status: 500 }
+      );
+    }
+
+    fotoUrl = admin.storage
+      .from(BUCKET)
+      .getPublicUrl(photoPath).data.publicUrl;
+  } else if (body.foto_url && typeof body.foto_url === 'string') {
+    fotoUrl = body.foto_url;
+  }
+
+  const { kota, provinsi } = locateKota(lokasi);
+
+  const updateData = {
+    nama_material: nama,
+    kategori: jenis,
+    stok,
+    harga,
+    lokasi,
+    kota,
+    provinsi,
+    satuan,
+    deskripsi_material: deskripsi,
+    kondisi_seller: kondisiSeller,
+    foto_url: fotoUrl,
+    kategori_ai: kategoriAi,
+  };
+
+  const { data: updated, error: updateError } = await admin
+    .from('material')
+    .update(updateData)
+    .eq('id_material', idMaterial)
+    .select('id_material, foto_url')
+    .single();
+
+  if (updateError) {
+    if (isMissingSchemaColumn(updateError)) {
+      return NextResponse.json(
+        {
+          error:
+            'Database material belum mendukung foto/kondisi. Jalankan migrasi supabase/upload_material_fields.sql.',
+        },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json(
+      {
+        error: `Gagal memperbarui material: ${updateError.message}`,
+      },
+      { status: 500 }
+    );
+  }
+
+  return NextResponse.json({
+    ok: true,
+    id_material: updated.id_material,
+    foto_url: updated.foto_url,
+  });
+}
+
+// ===================================================
 // GET: MENAMPILKAN MATERIAL MILIK SELLER
 // ===================================================
 export async function GET(request) {
