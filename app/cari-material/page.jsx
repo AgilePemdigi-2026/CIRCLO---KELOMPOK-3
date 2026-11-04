@@ -109,6 +109,7 @@ export default function CariMaterialPage() {
   const [orderNotice, setOrderNotice] = useState(null);
   const sessionIdRef = useRef(null);
   const scrollRef = useRef(null);
+  const sudahOtomatis = useRef(false);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -116,9 +117,13 @@ export default function CariMaterialPage() {
     }
   }, [messages, loading, error]);
 
-  const handleSend = async (e) => {
+  const handleSend = (e) => {
     e.preventDefault();
-    const text = input.trim();
+    kirimPesan(input);
+  };
+
+  const kirimPesan = async (teks) => {
+    const text = String(teks || "").trim();
     if (!text || loading) return;
 
     if (!sessionIdRef.current) {
@@ -213,6 +218,18 @@ export default function CariMaterialPage() {
       setLoading(false);
     }
   };
+
+  // Kalau datang dari kotak pencarian Beranda (?q=...), kirim pesannya otomatis satu kali.
+  useEffect(() => {
+    if (sudahOtomatis.current) return;
+    sudahOtomatis.current = true;
+    const q = new URLSearchParams(window.location.search).get("q")?.trim();
+    if (!q) return;
+    // Hapus ?q dari alamat supaya refresh halaman tidak mengirim ulang.
+    window.history.replaceState(null, "", window.location.pathname);
+    kirimPesan(q);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <>
