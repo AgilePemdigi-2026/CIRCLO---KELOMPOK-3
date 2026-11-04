@@ -3,21 +3,46 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation';
-import { CircleUserRound, Menu, X } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { CircleUserRound, LogOut, Menu, X } from 'lucide-react';
 import FlashBanner from '@/components/FlashBanner';
-import { useRole } from '@/lib/auth';
+import { LOGIN_PATH, useRole } from '@/lib/auth';
+import { supabase } from '@/lib/supabase';
+import { clearDraft, clearResult } from '@/lib/storage';
 import { NAV_BY_ROLE, dashboardPathFor } from '@/lib/roles';
 
 export default function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { role } = useRole();
   const [open, setOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const nav = NAV_BY_ROLE[role] || { links: [], profileLabel: 'Profil' };
 
   useEffect(() => {
     setOpen(false);
   }, [pathname]);
+
+  async function handleLogout() {
+    if (loggingOut) return;
+
+    setLoggingOut(true);
+
+    try {
+      if (supabase) {
+        const { error } = await supabase.auth.signOut();
+        if (error) throw error;
+      }
+
+      clearDraft();
+      clearResult();
+
+      router.replace(LOGIN_PATH);
+      router.refresh();
+    } catch {
+      setLoggingOut(false);
+    }
+  }
 
   return (
     <>
@@ -50,6 +75,16 @@ export default function Navbar() {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleLogout}
+            disabled={loggingOut}
+            aria-label="Keluar dari akun"
+            title="Keluar dari akun"
+            className="flex items-center justify-center rounded-lg p-2 text-circlo-green transition hover:bg-circlo-soft disabled:opacity-50"
+          >
+            <LogOut className="h-5 w-5" strokeWidth={2} />
+          </button>
           <Link href="/profile" className="flex items-center gap-2 text-[14px] text-circlo-ink/80 hover:text-circlo-green">
             <CircleUserRound className="h-6 w-6 text-circlo-green" strokeWidth={2} />
             {nav.profileLabel}
