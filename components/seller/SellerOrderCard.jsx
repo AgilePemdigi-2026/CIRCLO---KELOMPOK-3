@@ -62,16 +62,15 @@ export default function SellerOrderCard({ order, onUpdated, showDetail = true })
   };
   const quantity = items.reduce((sum, item) => sum + Number(item.kuantitas_pesan || 0), 0);
   const buyerName = order?.buyer?.nama_buyer || 'Pembeli CIRCLO';
-  const buyerEmail = order?.buyer?.email_buyer || null;
   const actions = useMemo(
     () => actionsFor(order).filter((action) => showDetail || action.key !== 'detail'),
     [order, showDetail],
   );
   const config = dialog ? actionDialog(dialog, order) : null;
 
-  const mailto = buyerEmail
-    ? `mailto:${buyerEmail}?subject=${encodeURIComponent(`Pesanan #${order.id_pesanan} - CIRCLO`)}`
-    : null;
+  // "Hubungi Pembeli" membuka percakapan Chat dengan pembeli pesanan ini.
+  const buyerId = order?.buyer?.id_buyer || order?.id_buyer;
+  const chatHref = buyerId ? `/chat?buyer=${buyerId}` : null;
 
   useEffect(() => {
     if (!dialog) return undefined;
@@ -186,19 +185,19 @@ export default function SellerOrderCard({ order, onUpdated, showDetail = true })
           <div className="flex flex-wrap items-center gap-2">
             {actions.map((action) => {
               if (action.key === 'contact') {
-                return mailto ? (
-                  <a
+                return chatHref ? (
+                  <Link
                     key={action.key}
-                    href={mailto}
+                    href={chatHref}
                     className="inline-flex items-center gap-2 rounded-lg border border-circlo-green/50 bg-white px-4 py-2 text-[13px] font-semibold text-circlo-green hover:bg-circlo-soft"
                   >
                     <ActionIcon action={action.key} /> {action.label}
-                  </a>
+                  </Link>
                 ) : (
                   <span
                     key={action.key}
                     className="inline-flex cursor-not-allowed items-center gap-2 rounded-lg border border-circlo-line px-4 py-2 text-[13px] font-semibold text-circlo-muted"
-                    title="Email pembeli belum tersedia"
+                    title="Data pembeli belum tersedia"
                   >
                     <ActionIcon action={action.key} /> {action.label}
                   </span>
