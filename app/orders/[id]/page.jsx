@@ -9,6 +9,7 @@ import Footer from '@/components/Footer';
 import RoleGate from '@/components/RoleGate';
 import MaterialImage from '@/components/MaterialImage';
 import { getAccessToken } from '@/lib/auth';
+import CancelOrderButton from '@/components/orders/CancelOrderButton';
 
 // Halaman Order Detail & Tracking (SRS 3.1.10, Gambar 1.10) untuk use case 4.12 Melihat Status Pesanan.
 // Teks yang dipakai skenario Gherkin: "Detail Pesanan", "Status Pesanan", "Status Terbaru",
@@ -45,17 +46,19 @@ function fmtLong(value) {
   return new Intl.DateTimeFormat('id-ID', { dateStyle: 'long', timeStyle: 'short' }).format(d);
 }
 
-// Status dari database dipetakan ke empat tahap pada mockup, ditambah kondisi Ditolak (SRS 4.8).
+// Status pesanan mencakup Ditolak oleh Seller dan Dibatalkan oleh Buyer.
 function parseStatus(status) {
   const v = String(status || '').toLowerCase();
-  if (/tolak|batal/.test(v)) return { rejected: true, index: 0 };
+  if (/batal/.test(v)) return { rejected: true, cancelled: true, index: 0 };
+  if (/tolak/.test(v)) return { rejected: true, cancelled: false, index: 0 };
   if (/selesai|diterima/.test(v)) return { rejected: false, index: 3 };
   if (/salur|kirim|siap/.test(v)) return { rejected: false, index: 2 };
   if (/proses/.test(v) || (/konfirmasi/.test(v) && !/menunggu/.test(v))) return { rejected: false, index: 1 };
   return { rejected: false, index: 0 };
 }
 
-function statusLabel({ rejected, index }) {
+function statusLabel({ rejected, cancelled, index }) {
+  if (cancelled) return 'Dibatalkan';
   if (rejected) return 'Ditolak';
   return index === 0 ? 'Menunggu Konfirmasi' : STEPS[index];
 }
@@ -78,16 +81,18 @@ function buildTimeline(data) {
   const dikirim = data.order.metode_kirim === 'Dikirim';
 
   if (parsed.rejected) {
-    const rejection = log.find((row) => /tolak|batal/.test(row.text));
+    const rejection = log.find((row) => parsed.cancelled ? /batal/.test(row.text) : /tolak/.test(row.text));
     return {
       parsed,
       steps: [
         { title: STEPS[0], state: 'done', time: fmtStep(timeOf(0)), note: '' },
         {
-          title: 'Ditolak',
+          title: parsed.cancelled ? 'Dibatalkan' : 'Ditolak',
           state: 'rejected',
           time: fmtStep(rejection?.waktu_update),
-          note: rejection?.status_update || 'Informasi Penolakan: pesanan tidak dapat dipenuhi oleh penjual.',
+          note: rejection?.status_update || (parsed.cancelled
+            ? 'Pesanan dibatalkan oleh pembeli.'
+            : 'Informasi Penolakan: pesanan tidak dapat dipenuhi oleh penjual.'),
         },
       ],
     };
@@ -353,23 +358,40 @@ export default function OrderDetailPage() {
       </div>
       <RoleGate allow={['buyer']}>
         <main className="mx-auto w-full max-w-[1240px] px-6 py-10 sm:px-10 print:hidden">
-          <Link
-            href="/buyer"
-            className="inline-flex items-center gap-2 text-[14px] font-medium text-circlo-green hover:underline"
-          >
-            <ArrowLeft className="h-4 w-4" /> Kembali ke Beranda
-          </Link>
 
-          <h1 className="mt-5 font-display text-[30px] font-semibold leading-tight text-circlo-ink">
-            Detail Pesanan #{code}
-          </h1>
-          {timeline && (
-            <p className="mt-3 flex items-center gap-2 text-[15px] text-circlo-ink">
-              <span className="sr-only">Status Pesanan, Status Terbaru: </span>
-              <span className={`h-2.5 w-2.5 rounded-full ${dotColor(timeline.parsed)}`} />
-              {statusLabel(timeline.parsed)}
-            </p>
-          )}
+<Link
+  href="/orders"
+  className="inline-flex items-center gap-2 text-[14px] font-medium text-circlo-green hover:underline"
+>
+  <ArrowLeft className="h-4 w-4" />
+  Kembali ke Pesanan
+</Link>
+
+
+          {/* Header pesanan: tombol pembatalan terlihat jelas di kanan atas */}
+          <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="font-display text-[30px] font-semibold leading-tight text-circlo-ink">
+                Detail Pesanan #{code}
+              </h1>
+              {timeline && (
+                <p className="mt-3 flex items-center gap-2 text-[15px] text-circlo-ink">
+                  <span className="sr-only">Status Pesanan, Status Terbaru: </span>
+                  <span className={`h-2.5 w-2.5 rounded-full ${dotColor(timeline.parsed)}`} />
+                  {statusLabel(timeline.parsed)}
+                </p>
+              )}
+            </div>
+
+            {/* Tombol hanya muncul untuk pesanan asli berstatus Menunggu Konfirmasi */}
+            {!demo && data && !loading && (
+              <CancelOrderButton
+                idPesanan={data.order.id_pesanan}
+                statusPesanan={data.order.status_pesanan}
+                compact
+              />
+            )}
+          </div>
 
           {demo && (
             <p className="mt-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-800">
@@ -589,6 +611,7 @@ export default function OrderDetailPage() {
                     <Receipt className="h-4 w-4" /> Lihat Faktur
                   </button>
                 </section>
+
               </div>
             </div>
           )}
