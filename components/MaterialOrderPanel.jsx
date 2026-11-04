@@ -1,13 +1,10 @@
 
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import OrderModal from "@/components/OrderModal";
+import { MessageCircle, ShoppingCart, ShoppingBag } from "lucide-react";
 
 export default function MaterialOrderPanel({ material }) {
-  const [open, setOpen] = useState(false);
-
   const stok = Number(material?.stok || 0);
   const harga = Number(material?.harga);
 
@@ -17,46 +14,62 @@ export default function MaterialOrderPanel({ material }) {
     Number.isFinite(harga) &&
     harga >= 0;
 
+  const checkoutUrl = {
+    pathname: "/checkout",
+    query: {
+      id: material.id_material,
+      nama: material.nama_material || "Material",
+      harga,
+      stok,
+      satuan: material.satuan || "unit",
+    },
+  };
+
   return (
-    <div className="mt-6 space-y-3">
+    <div className="mt-6">
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        {/* CHAT */}
+        <button
+          type="button"
+          disabled
+          title="Fitur chat toko akan segera tersedia"
+          className="flex items-center justify-center gap-2 rounded-lg border border-[#3f6a0b] bg-white px-2 py-3 text-xs font-semibold text-[#3f6a0b] opacity-60 sm:text-sm"
+        >
+          <MessageCircle size={18} />
+          Chat
+        </button>
 
-      {/* Pemesanan lama - tetap dipertahankan */}
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        disabled={stok <= 0}
-        className="rounded-lg bg-[#3f6a0b] px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
-      >
-        {stok > 0 ? "Pesan material ini" : "Stok habis"}
-      </button>
+        {/* KERANJANG */}
+        <button
+          type="button"
+          disabled
+          title="Fitur keranjang akan segera tersedia"
+          className="flex items-center justify-center gap-2 rounded-lg border border-[#3f6a0b] bg-white px-2 py-3 text-xs font-semibold text-[#3f6a0b] opacity-60 sm:text-sm"
+        >
+          <ShoppingCart size={18} />
+          Keranjang
+        </button>
 
-      {/* Tombol menuju Checkout Sprint 2 */}
-      {bisaCheckout && (
-        <div>
+        {/* CHECKOUT */}
+        {bisaCheckout ? (
           <Link
-            href={{
-              pathname: "/checkout",
-              query: {
-                id: material.id_material,
-                nama: material.nama_material || "Material",
-                harga: harga,
-                stok: stok,
-                satuan: material.satuan || "unit",
-              },
-            }}
-            className="inline-block rounded-lg border border-[#3f6a0b] px-5 py-3 text-sm font-semibold text-[#3f6a0b] hover:bg-green-50"
+            href={checkoutUrl}
+            className="flex items-center justify-center gap-2 rounded-lg bg-[#3f6a0b] px-2 py-3 text-xs font-semibold text-white transition hover:bg-[#345609] sm:text-sm"
           >
-            Checkout 3 Langkah
+            <ShoppingBag size={18} />
+            Checkout
           </Link>
-        </div>
-      )}
-
-      {open && (
-        <OrderModal
-          material={material}
-          onClose={() => setOpen(false)}
-        />
-      )}
+        ) : (
+          <button
+            type="button"
+            disabled
+            className="flex items-center justify-center gap-2 rounded-lg bg-gray-300 px-2 py-3 text-xs font-semibold text-gray-600 sm:text-sm"
+          >
+            <ShoppingBag size={18} />
+            Stok Habis
+          </button>
+        )}
+      </div>
     </div>
   );
 }
