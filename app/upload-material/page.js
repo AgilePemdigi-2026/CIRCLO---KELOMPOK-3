@@ -355,10 +355,49 @@ function UploadMaterialForm() {
   }
 
   if (isEdit) {
-    setNotice({
-      type: 'error',
-      text: 'Fitur edit material production belum tersedia.',
-    });
+    setLoading(true);
+
+    try {
+      const updated = await updateMaterial(editId, {
+        nama: form.name.trim(),
+        deskripsi: form.description.trim(),
+        jumlah: Number(form.quantity),
+        harga: Number(form.price),
+        satuan: form.satuan || 'kg',
+        lokasi: form.location.trim(),
+        kondisi_seller: form.condition.trim(),
+        foto: photo?.remote ? undefined : photo?.dataUrl,
+        kategori: aiResult?.category || undefined,
+        kategori_ai: aiResult?.category || undefined,
+        jenis_material: aiResult?.category || undefined,
+      });
+
+      if (!updated?.ok) {
+        throw new Error('Material gagal diperbarui.');
+      }
+
+      clearDraft();
+      clearResult();
+
+      setFlash({
+        type: 'ok',
+        text: 'Material berhasil diperbarui!',
+        note: isDemoStore
+          ? 'Mode demo: tersimpan di browser ini saja, belum ke database.'
+          : 'Perubahan material berhasil disimpan.',
+      });
+
+      router.push('/my-materials');
+    } catch (error) {
+      console.error('UPDATE MATERIAL ERROR:', error);
+
+      setNotice({
+        type: 'error',
+        text: error.message || 'Gagal memperbarui material.',
+      });
+    } finally {
+      setLoading(false);
+    }
     return;
   }
 
@@ -419,7 +458,7 @@ function UploadMaterialForm() {
             <h1 className="font-display text-[32px] font-semibold leading-tight text-circlo-ink">{isEdit ? 'Edit Material' : 'Upload Material'}</h1>
             <p className="mt-3 text-[16px] leading-[1.6] text-circlo-muted">
               {isEdit
-                ? 'Perbarui informasi material Anda. Tekan Save untuk menyimpan perubahan, atau Submit untuk meminta AI mengklasifikasi ulang.'
+                ? 'Perbarui informasi material Anda, lalu simpan perubahan.'
                 : 'Bagikan sisa material Anda. Deskripsikan material, masukkan foto, dan lengkapi detailnya agar AI dapat membantu klasifikasi material dengan lebih akurat.'}
             </p>
 
@@ -593,7 +632,7 @@ function UploadMaterialForm() {
     ) : (
       <Sparkles className="h-4 w-4" />
     )}
-    {loading || saving ? 'Menerbitkan material...' : 'Submit'}
+    {loading || saving ? (isEdit ? 'Menyimpan perubahan...' : 'Menerbitkan material...') : (isEdit ? 'Simpan Perubahan' : 'Submit')}
   </button>
 </div>
 </form>
