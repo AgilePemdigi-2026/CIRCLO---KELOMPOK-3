@@ -39,7 +39,7 @@ export default function CheckoutFlow() {
     provinsi: "",
     kodePos: "",
     metodePembayaran: "Virtual Account",
-    bank: "BCA",
+    bank: "BRI",
   });
 
   // Mengambil data material dari URL
@@ -360,6 +360,7 @@ export default function CheckoutFlow() {
             <PembayaranStep
               data={data}
               onChange={update}
+              subtotal={subtotal}
             />
 
             <div className="mt-6 rounded-xl border border-green-200 bg-green-50 p-5">
@@ -411,11 +412,9 @@ export default function CheckoutFlow() {
 
                 <p>
                   <strong>Metode Pembayaran:</strong>{" "}
-                  {data.metodePembayaran}
-                  {data.metodePembayaran ===
-                    "Virtual Account" &&
-                    data.bank &&
-                    ` - ${data.bank}`}
+                  {data.metodePembayaran === "Virtual Account"
+                    ? `Virtual Account (${data.bank || "BRI"})`
+                    : "QRIS"}
                 </p>
 
                 <p className="font-bold">
@@ -425,10 +424,7 @@ export default function CheckoutFlow() {
             </div>
 
             <p className="mt-4 rounded-lg bg-amber-50 p-4 text-sm text-amber-800">
-              Pembayaran online belum aktif.
-              Tombol Buat Pesanan hanya membuat pesanan
-              dengan status Menunggu Konfirmasi,
-              bukan menyelesaikan pembayaran.
+              Mode simulasi: Tombol Buat Pesanan dapat langsung diklik untuk menyelesaikan pesanan tanpa perlu melakukan pembayaran sungguhan.
             </p>
           </>
         )}
@@ -517,11 +513,9 @@ export default function CheckoutFlow() {
           <div className="flex justify-between gap-3">
             <span>Pembayaran</span>
             <span>
-              {data.metodePembayaran}
-              {data.metodePembayaran ===
-                "Virtual Account" &&
-                data.bank &&
-                ` - ${data.bank}`}
+              {data.metodePembayaran === "Virtual Account"
+                ? `VA ${data.bank || "BRI"}`
+                : "QRIS"}
             </span>
           </div>
 
