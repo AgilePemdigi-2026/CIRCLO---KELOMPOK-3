@@ -176,7 +176,7 @@ export default function ChatApp() {
   }
 
   return (
-    <main className="flex h-[calc(100vh-81px)] min-h-[560px] border-t border-circlo-line/60">
+    <main className="flex min-h-0 flex-1 overflow-hidden border-t border-circlo-line/60">
       <ConversationList
         items={list.items}
         selectedId={selectedId}
