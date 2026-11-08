@@ -106,3 +106,32 @@ test('kolom diterima_pada belum dibuat: chat tetap jalan, centang tetap 1', asyn
   assert.equal(room.messages[0].text, 'Halo');
   assert.equal((await svc.getRoom(buyer, id)).messages[0].delivered, false);
 });
+
+test('dibaca lewat store Supabase: dibaca_pada hanya terisi saat ruang dibuka dengan read=true', async () => {
+  const { admin, svc } = setup();
+  const { id } = await svc.openConversation(buyer, { id_material: 7 });
+  await svc.sendMessage(buyer, id, { text: 'Halo', client_id: 'r1' });
+  await svc.getRoom(seller, id); // dimuat tanpa terlihat di layar
+  assert.equal(admin.db.pesan_chat[0].dibaca_pada ?? null, null);
+  assert.ok(admin.db.pesan_chat[0].diterima_pada);
+  await svc.getRoom(buyer, id, { read: true }); // pengirim sendiri: tidak berpengaruh
+  assert.equal(admin.db.pesan_chat[0].dibaca_pada ?? null, null);
+  await svc.getRoom(seller, id, { read: true });
+  assert.ok(admin.db.pesan_chat[0].dibaca_pada);
+  const m = (await svc.getRoom(buyer, id)).messages[0];
+  assert.deepEqual([m.delivered, m.read], [true, true]);
+});
+
+test('kolom dibaca_pada belum dibuat: chat tetap jalan, centang berhenti di abu-abu', async () => {
+  const admin = fakeSupabase({
+    material: [{ id_material: 7, id_seller: 70, nama_material: 'Sisa Kain Katun Hitam', kategori: 'Tekstil', stok: 20, satuan: 'kg', status_material: true }],
+    penjual: [{ id_seller: 70, auth_user_id: S, nama_seller: 'Toko Kain' }],
+  }, { missingColumns: { pesan_chat: ['dibaca_pada'] } });
+  const svc = createChatService(createSupabaseStore(admin));
+  const { id } = await svc.openConversation(buyer, { id_material: 7 });
+  await svc.sendMessage(buyer, id, { text: 'Halo', client_id: 'r2' });
+  const asSeller = await svc.getRoom(seller, id, { read: true });
+  assert.equal(asSeller.messages[0].text, 'Halo');
+  const m = (await svc.getRoom(buyer, id)).messages[0];
+  assert.deepEqual([m.delivered, m.read], [true, false]);
+});

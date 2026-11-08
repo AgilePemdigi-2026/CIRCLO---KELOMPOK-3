@@ -35,8 +35,16 @@ function MaterialCard({ material }) {
   );
 }
 
-// Penanda status pesan milik sendiri. 1 centang = terkirim (belum diterima lawan bicara), 2 centang = diterima.
+// Penanda status pesan milik sendiri. 1 centang = terkirim (belum diterima lawan bicara),
+// 2 centang abu-abu = diterima, 2 centang biru = dibaca.
 function StatusTicks({ status }) {
+  if (status === 'read') {
+    return (
+      <span role="img" aria-label="Dibaca" title="Dibaca" className="inline-flex text-[#6CC4F5]">
+        <CheckCheck className="h-4 w-4" aria-hidden="true" />
+      </span>
+    );
+  }
   if (status === 'delivered') {
     return (
       <span role="img" aria-label="Diterima" title="Diterima" className="inline-flex">

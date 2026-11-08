@@ -20,6 +20,13 @@ export default function ChatApp() {
   const [needsLogin, setNeedsLogin] = useState(false);
   const activeId = useRef(null);
   const localRef = useRef([]);
+  const showRoomRef = useRef(false);
+  useEffect(() => {
+    showRoomRef.current = showRoom;
+  }, [showRoom]);
+
+  // Pesan baru dianggap dibaca hanya bila ruang percakapan terlihat: tab sedang aktif, dan (di layar kecil) ruangnya sedang dibuka, bukan daftar.
+  const roomIsVisible = () => document.visibilityState === 'visible' && (showRoomRef.current || Boolean(window.matchMedia?.('(min-width: 1024px)').matches));
 
   const updateLocal = useCallback((fn) => {
     const next = fn(localRef.current);
@@ -47,7 +54,7 @@ export default function ChatApp() {
   const loadRoom = useCallback(async (id, { silent = false } = {}) => {
     if (!silent) setRoom({ loading: true, data: null, error: null });
     try {
-      const data = await fetchRoom(id, role);
+      const data = await fetchRoom(id, role, { read: roomIsVisible() });
       if (activeId.current === id) setRoom({ loading: false, data, error: null });
     } catch (e) {
       if (activeId.current !== id) return;
@@ -153,8 +160,8 @@ export default function ChatApp() {
     const pending = local
       .filter((i) => i.conversation_id === selectedId && !known.has(i.client_id))
       .map((i) => ({ ...i, key: `local-${i.client_id}`, mine: true }));
-    // Pesan milik sendiri: 'sent' = 1 centang (sudah di server, belum diterima lawan), 'delivered' = 2 centang.
-    const status = (m) => (!m.mine ? 'received' : m.delivered ? 'delivered' : 'sent');
+    // Pesan milik sendiri: 'sent' = 1 centang, 'delivered' = 2 centang abu-abu, 'read' = 2 centang biru.
+    const status = (m) => (!m.mine ? 'received' : m.read ? 'read' : m.delivered ? 'delivered' : 'sent');
     return [...server.map((m) => ({ ...m, status: status(m), key: m.id })), ...pending];
   }, [room.data, local, selectedId]);
 

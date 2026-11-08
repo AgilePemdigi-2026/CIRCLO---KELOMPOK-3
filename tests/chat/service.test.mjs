@@ -138,3 +138,32 @@ test('kirim ulang dengan client_id sama setelah koneksi putus: satu pesan, tetap
   const { messages } = await svc.getRoom(buyer, 'c-siti');
   assert.equal(messages.filter((m) => m.text === 'Pesan penting').length, 1);
 });
+
+test('dibaca (centang biru): hanya saat lawan bicara membuka ruang percakapan dengan read=true', async () => {
+  const svc = setup();
+  await svc.sendMessage(buyer, 'c-ecotextile', { text: 'Cek dibaca', client_id: 'r1' });
+  const view = async () => (await svc.getRoom(buyer, 'c-ecotextile')).messages.find((m) => m.text === 'Cek dibaca');
+  assert.deepEqual([(await view()).delivered, (await view()).read], [false, false]); // 1 centang
+  await svc.listConversations(seller); // aplikasi Seller terbuka, daftar percakapan dimuat
+  assert.deepEqual([(await view()).delivered, (await view()).read], [true, false]); // 2 centang abu-abu
+  await svc.getRoom(seller, 'c-ecotextile'); // ruang dimuat di latar belakang / tanpa terlihat di layar
+  assert.equal((await view()).read, false);
+  await svc.getRoom(seller, 'c-ecotextile', { read: true }); // ruang terbuka di layar Seller
+  assert.deepEqual([(await view()).delivered, (await view()).read], [true, true]); // 2 centang biru
+});
+
+test('membaca pesan juga menandainya diterima, dan pengirim tidak bisa membaca pesannya sendiri', async () => {
+  const svc = setup();
+  await svc.sendMessage(buyer, 'c-siti', { text: 'Sudah dibaca?', client_id: 'r2' });
+  await svc.getRoom(buyer, 'c-siti', { read: true }); // pengirim membuka ruangnya sendiri
+  const mine = (await svc.getRoom(buyer, 'c-siti')).messages.find((m) => m.text === 'Sudah dibaca?');
+  assert.deepEqual([mine.delivered, mine.read], [false, false]);
+  await svc.getRoom({ id: 'demo-seller-3', role: 'seller', name: 'Siti Rahma' }, 'c-siti', { read: true }); // lawan bicara membuka langsung
+  const after = (await svc.getRoom(buyer, 'c-siti')).messages.find((m) => m.text === 'Sudah dibaca?');
+  assert.deepEqual([after.delivered, after.read], [true, true]);
+});
+
+test('riwayat awal data demo sudah berstatus dibaca', async () => {
+  const { messages } = await setup().getRoom(buyer, 'c-ecotextile');
+  assert.ok(messages.every((m) => m.read));
+});

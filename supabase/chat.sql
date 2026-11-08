@@ -49,16 +49,26 @@ create unique index if not exists pesan_chat_client_unik
   on public.pesan_chat (id_percakapan, client_id) where client_id is not null;
 create index if not exists pesan_chat_riwayat_idx on public.pesan_chat (id_percakapan, dibuat_pada);
 
--- Status pesan: diterima_pada terisi saat aplikasi penerima memuat pesan itu.
---   kosong  -> 1 centang (terkirim, belum diterima: jaringan lawan buruk atau aplikasinya belum dibuka)
---   terisi  -> 2 centang (diterima)
--- Pesan lama (sebelum kolom ada) dianggap sudah diterima. Aman dijalankan berulang.
+-- Status pesan:
+--   diterima_pada kosong                  -> 1 centang (terkirim, belum diterima: jaringan lawan buruk atau aplikasinya belum dibuka)
+--   diterima_pada terisi                  -> 2 centang abu-abu (diterima, belum dibuka)
+--   dibaca_pada terisi                    -> 2 centang biru (dibaca: ruang percakapan terbuka di layar penerima)
+-- Pesan lama (sebelum kolom ada) dianggap sudah diterima dan dibaca. Aman dijalankan berulang.
 do $$
 begin
   if not exists (select 1 from information_schema.columns
                  where table_schema = 'public' and table_name = 'pesan_chat' and column_name = 'diterima_pada') then
     alter table public.pesan_chat add column diterima_pada timestamptz;
     update public.pesan_chat set diterima_pada = dibuat_pada where diterima_pada is null;
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (select 1 from information_schema.columns
+                 where table_schema = 'public' and table_name = 'pesan_chat' and column_name = 'dibaca_pada') then
+    alter table public.pesan_chat add column dibaca_pada timestamptz;
+    update public.pesan_chat set dibaca_pada = dibuat_pada where dibaca_pada is null;
   end if;
 end $$;
 
