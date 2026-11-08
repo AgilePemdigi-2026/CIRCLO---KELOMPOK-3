@@ -170,7 +170,7 @@ function KartuMaterial({ m, besar }) {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={src}
-          alt=""
+          alt={nama(m)}
           className="absolute inset-0 h-full w-full object-cover object-[50%_35%]"
         />
         {nilaiSkor !== null && (
