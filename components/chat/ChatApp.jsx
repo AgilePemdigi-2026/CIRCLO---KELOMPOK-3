@@ -117,10 +117,14 @@ export default function ChatApp() {
   const send = useCallback(async (text, existing) => {
     if (!selectedId) return;
     const convId = selectedId;
+    // Perangkat jelas-jelas offline: tidak perlu menunggu permintaan gagal, langsung tampilkan "Coba Lagi".
+    const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+    const status = offline ? 'failed' : 'sending';
     const item = existing
-      ? { ...existing, status: 'sending' }
-      : { client_id: newClientId(), conversation_id: convId, text, created_at: new Date().toISOString(), status: 'sending' };
+      ? { ...existing, status }
+      : { client_id: newClientId(), conversation_id: convId, text, created_at: new Date().toISOString(), status };
     updateLocal((prev) => (existing ? prev.map((i) => (i.client_id === item.client_id ? item : i)) : [...prev, item]));
+    if (offline) return;
     try {
       const { message } = await postMessage(convId, { text: item.text, client_id: item.client_id }, role);
       updateLocal((prev) => prev.filter((i) => i.client_id !== item.client_id));
@@ -134,13 +138,24 @@ export default function ChatApp() {
     }
   }, [selectedId, role, updateLocal, loadList, onApiError]);
 
+  // Pesan yang ternyata sudah masuk ke server (jaringan putus tepat setelah terkirim) tidak perlu lagi
+  // menunggu "Coba Lagi": hapus dari outbox supaya tidak tersisa di perangkat.
+  useEffect(() => {
+    const server = room.data?.messages;
+    if (!server?.length) return;
+    const known = new Set(server.map((m) => m.client_id).filter(Boolean));
+    if (localRef.current.some((i) => known.has(i.client_id))) updateLocal((prev) => prev.filter((i) => !known.has(i.client_id)));
+  }, [room.data, updateLocal]);
+
   const messages = useMemo(() => {
     const server = room.data?.messages || [];
     const known = new Set(server.map((m) => m.client_id).filter(Boolean));
     const pending = local
       .filter((i) => i.conversation_id === selectedId && !known.has(i.client_id))
       .map((i) => ({ ...i, key: `local-${i.client_id}`, mine: true }));
-    return [...server.map((m) => ({ ...m, status: 'sent', key: m.id })), ...pending];
+    // Pesan milik sendiri: 'sent' = 1 centang (sudah di server, belum diterima lawan), 'delivered' = 2 centang.
+    const status = (m) => (!m.mine ? 'received' : m.delivered ? 'delivered' : 'sent');
+    return [...server.map((m) => ({ ...m, status: status(m), key: m.id })), ...pending];
   }, [room.data, local, selectedId]);
 
   if (needsLogin) {

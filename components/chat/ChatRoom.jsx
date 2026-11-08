@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Paperclip, Send } from 'lucide-react';
+import { ArrowLeft, Check, CheckCheck, Clock, Paperclip, RotateCw, Send } from 'lucide-react';
 import Avatar from './Avatar';
-import { formatClock, groupByDay } from '@/lib/chat/format';
+import { formatClock, formatClockWithZone, groupByDay } from '@/lib/chat/format';
 
 const MAX = 1000;
 
@@ -35,6 +35,25 @@ function MaterialCard({ material }) {
   );
 }
 
+// Penanda status pesan milik sendiri. 1 centang = terkirim (belum diterima lawan bicara), 2 centang = diterima.
+function StatusTicks({ status }) {
+  if (status === 'delivered') {
+    return (
+      <span role="img" aria-label="Diterima" title="Diterima" className="inline-flex">
+        <CheckCheck className="h-4 w-4" aria-hidden="true" />
+      </span>
+    );
+  }
+  if (status === 'sent') {
+    return (
+      <span role="img" aria-label="Terkirim" title="Terkirim" className="inline-flex">
+        <Check className="h-4 w-4" aria-hidden="true" />
+      </span>
+    );
+  }
+  return null;
+}
+
 function Bubble({ m, other, showAvatar, onRetry }) {
   const failed = m.status === 'failed';
   const tone = failed
@@ -48,14 +67,21 @@ function Bubble({ m, other, showAvatar, onRetry }) {
       <div className={`max-w-[80%] rounded-2xl px-5 py-4 lg:max-w-[80%] ${tone}`}>
         <p className="whitespace-pre-wrap break-words text-[17px] leading-relaxed">{m.text}</p>
         <div className={`mt-1 flex items-center justify-end gap-2 text-[12.5px] ${m.mine && !failed ? 'text-white/70' : 'text-circlo-muted'}`}>
-          {m.status === 'sending' && <span>Mengirim…</span>}
+          {m.status === 'sending' && (
+            <span className="inline-flex items-center gap-1">
+              <Clock className="h-3.5 w-3.5" aria-hidden="true" /> Mengirim…
+            </span>
+          )}
           {failed && (
             <>
               <span role="alert" className="font-medium text-red-700">Pesan gagal dikirim</span>
-              <button type="button" onClick={() => onRetry(m)} className="font-semibold text-circlo-green underline">Coba Lagi</button>
+              <button type="button" onClick={() => onRetry(m)} className="inline-flex items-center gap-1 font-semibold text-circlo-green underline">
+                <RotateCw className="h-3.5 w-3.5" aria-hidden="true" />Coba Lagi
+              </button>
             </>
           )}
-          <time dateTime={m.created_at}>{formatClock(m.created_at)}</time>
+          <time dateTime={m.created_at} title={formatClockWithZone(m.created_at)}>{formatClock(m.created_at)}</time>
+          {m.mine && <StatusTicks status={m.status} />}
         </div>
       </div>
     </div>

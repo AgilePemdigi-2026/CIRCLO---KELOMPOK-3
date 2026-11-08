@@ -97,3 +97,44 @@ test('openConversation: validasi input', async () => {
   const r = await svc.openConversation(seller, { buyer_auth_id: 'buyer-x', buyer_name: 'Rina' });
   assert.ok(r.id);
 });
+
+test('status pesan: 1 centang saat terkirim, 2 centang setelah aplikasi lawan bicara memuatnya', async () => {
+  const svc = setup();
+  const { message } = await svc.sendMessage(buyer, 'c-ecotextile', { text: 'Cek status', client_id: 's1' });
+  const status = async (user, conv, text) => (await svc.getRoom(user, conv)).messages.find((m) => m.text === text).delivered;
+  assert.equal(message.delivered, false); // baru tersimpan di server
+  assert.equal(await status(buyer, 'c-ecotextile', 'Cek status'), false); // Seller belum membuka aplikasi
+  await svc.listConversations(seller); // aplikasi Seller terbuka dan memuat daftar percakapan
+  assert.equal(await status(buyer, 'c-ecotextile', 'Cek status'), true);
+});
+
+test('membuka ruang percakapan juga menandai pesan lawan bicara sebagai diterima', async () => {
+  const svc = setup();
+  await svc.sendMessage(seller, 'c-ecotextile', { text: 'Stok sudah saya cek', client_id: 's2' });
+  const status = async () => (await svc.getRoom(seller, 'c-ecotextile')).messages.find((m) => m.text === 'Stok sudah saya cek').delivered;
+  assert.equal(await status(), false);
+  await svc.getRoom(buyer, 'c-ecotextile');
+  assert.equal(await status(), true);
+});
+
+test('pengirim membuka chat sendiri tidak membuat pesannya berstatus diterima', async () => {
+  const svc = setup();
+  await svc.sendMessage(buyer, 'c-siti', { text: 'Masih ada?', client_id: 's3' });
+  await svc.listConversations(buyer);
+  await svc.getRoom(buyer, 'c-siti');
+  assert.equal((await svc.getRoom(buyer, 'c-siti')).messages.find((m) => m.text === 'Masih ada?').delivered, false);
+});
+
+test('riwayat awal data demo sudah berstatus diterima', async () => {
+  const { messages } = await setup().getRoom(buyer, 'c-ecotextile');
+  assert.ok(messages.every((m) => m.delivered));
+});
+
+test('kirim ulang dengan client_id sama setelah koneksi putus: satu pesan, tetap 1 centang', async () => {
+  const svc = setup();
+  await svc.sendMessage(buyer, 'c-siti', { text: 'Pesan penting', client_id: 'ulang-1' }); // sampai di server, respons hilang
+  const again = await svc.sendMessage(buyer, 'c-siti', { text: 'Pesan penting', client_id: 'ulang-1' }); // pengguna menekan Coba Lagi
+  assert.equal(again.message.delivered, false);
+  const { messages } = await svc.getRoom(buyer, 'c-siti');
+  assert.equal(messages.filter((m) => m.text === 'Pesan penting').length, 1);
+});

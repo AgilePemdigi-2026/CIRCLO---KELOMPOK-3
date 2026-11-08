@@ -70,3 +70,39 @@ test('kolom foto_url belum ada di tabel material: tetap jalan tanpa foto', async
   assert.equal(room.conversation.material.nama, 'Sisa Kain Katun Hitam');
   assert.equal(room.conversation.material.foto_url, null);
 });
+
+test('status pesan lewat store Supabase: diterima_pada terisi saat penerima memuat pesan', async () => {
+  const { admin, svc } = setup();
+  const { id } = await svc.openConversation(buyer, { id_material: 7 });
+  await svc.sendMessage(buyer, id, { text: 'Apakah masih ada?', client_id: 'd1' });
+  assert.equal((await svc.getRoom(buyer, id)).messages[0].delivered, false);
+  assert.equal(admin.db.pesan_chat[0].diterima_pada ?? null, null);
+  await svc.listConversations(seller); // aplikasi Seller terbuka
+  assert.equal((await svc.getRoom(buyer, id)).messages[0].delivered, true);
+  assert.ok(admin.db.pesan_chat[0].diterima_pada);
+});
+
+test('pesan sendiri tidak ditandai diterima, pesan lawan ditandai saat ruang dibuka', async () => {
+  const { svc } = setup();
+  const { id } = await svc.openConversation(buyer, { id_material: 7 });
+  await svc.sendMessage(buyer, id, { text: 'Halo', client_id: 'd2' });
+  await svc.sendMessage(seller, id, { text: 'Halo juga', client_id: 'd3' });
+  const asBuyer = await svc.getRoom(buyer, id); // Buyer memuat: pesan Seller jadi diterima, pesan Buyer sendiri belum
+  assert.deepEqual(asBuyer.messages.map((m) => [m.text, m.delivered]), [['Halo', false], ['Halo juga', true]]);
+  const asSeller = await svc.getRoom(seller, id); // Seller memuat: pesan Buyer ikut jadi diterima
+  assert.deepEqual(asSeller.messages.map((m) => [m.text, m.delivered]), [['Halo', true], ['Halo juga', true]]);
+});
+
+test('kolom diterima_pada belum dibuat: chat tetap jalan, centang tetap 1', async () => {
+  const admin = fakeSupabase({
+    material: [{ id_material: 7, id_seller: 70, nama_material: 'Sisa Kain Katun Hitam', kategori: 'Tekstil', stok: 20, satuan: 'kg', status_material: true }],
+    penjual: [{ id_seller: 70, auth_user_id: S, nama_seller: 'Toko Kain' }],
+  }, { missingColumns: { pesan_chat: ['diterima_pada'] } });
+  const svc = createChatService(createSupabaseStore(admin));
+  const { id } = await svc.openConversation(buyer, { id_material: 7 });
+  await svc.sendMessage(buyer, id, { text: 'Halo', client_id: 'd4' });
+  await svc.listConversations(seller);
+  const room = await svc.getRoom(seller, id);
+  assert.equal(room.messages[0].text, 'Halo');
+  assert.equal((await svc.getRoom(buyer, id)).messages[0].delivered, false);
+});

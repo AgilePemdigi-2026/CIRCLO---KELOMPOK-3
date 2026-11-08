@@ -49,6 +49,19 @@ create unique index if not exists pesan_chat_client_unik
   on public.pesan_chat (id_percakapan, client_id) where client_id is not null;
 create index if not exists pesan_chat_riwayat_idx on public.pesan_chat (id_percakapan, dibuat_pada);
 
+-- Status pesan: diterima_pada terisi saat aplikasi penerima memuat pesan itu.
+--   kosong  -> 1 centang (terkirim, belum diterima: jaringan lawan buruk atau aplikasinya belum dibuka)
+--   terisi  -> 2 centang (diterima)
+-- Pesan lama (sebelum kolom ada) dianggap sudah diterima. Aman dijalankan berulang.
+do $$
+begin
+  if not exists (select 1 from information_schema.columns
+                 where table_schema = 'public' and table_name = 'pesan_chat' and column_name = 'diterima_pada') then
+    alter table public.pesan_chat add column diterima_pada timestamptz;
+    update public.pesan_chat set diterima_pada = dibuat_pada where diterima_pada is null;
+  end if;
+end $$;
+
 -- Tabel hanya diakses lewat API server (service role), jadi RLS dinyalakan tanpa policy publik.
 alter table public.percakapan enable row level security;
 alter table public.pesan_chat enable row level security;
