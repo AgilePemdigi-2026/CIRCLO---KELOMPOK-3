@@ -28,9 +28,51 @@ create table if not exists public.percakapan (
   check (buyer_auth_id <> seller_auth_id)
 );
 
--- Satu percakapan per pasangan buyer-seller per material (material boleh kosong).
-create unique index if not exists percakapan_unik
-  on public.percakapan (buyer_auth_id, seller_auth_id, coalesce(id_material, -1));
+-- Satu percakapan per pasangan buyer-seller, seperti satu kontak di WhatsApp. Kolom id_material hanya
+-- menyimpan material terakhir yang dibahas (untuk kartu material di ruang chat), bukan bagian dari kunci.
+-- Versi lama membuat percakapan baru untuk tiap material, jadi data lama digabung dulu: pesan dipindah ke
+-- percakapan tertua milik pasangan itu, lalu material dan pratinjau pesan diambil dari yang paling baru aktif.
+-- Aman dijalankan berulang.
+do $$
+declare
+  p record;
+begin
+  for p in
+    select buyer_auth_id, seller_auth_id from public.percakapan
+    group by buyer_auth_id, seller_auth_id having count(*) > 1
+  loop
+    declare
+      keep_id uuid;
+      latest  public.percakapan%rowtype;
+    begin
+      select id into keep_id from public.percakapan
+        where buyer_auth_id = p.buyer_auth_id and seller_auth_id = p.seller_auth_id
+        order by dibuat_pada, id limit 1;
+      select * into latest from public.percakapan
+        where buyer_auth_id = p.buyer_auth_id and seller_auth_id = p.seller_auth_id
+        order by terakhir_pesan_at desc, id limit 1;
+
+      -- client_id dikosongkan pada pesan yang dipindah supaya tidak bentrok dengan indeks unik per percakapan.
+      update public.pesan_chat set id_percakapan = keep_id, client_id = null
+        where id_percakapan in (
+          select id from public.percakapan
+          where buyer_auth_id = p.buyer_auth_id and seller_auth_id = p.seller_auth_id and id <> keep_id);
+
+      delete from public.percakapan
+        where buyer_auth_id = p.buyer_auth_id and seller_auth_id = p.seller_auth_id and id <> keep_id;
+
+      update public.percakapan
+        set id_material = latest.id_material,
+            terakhir_pesan = latest.terakhir_pesan,
+            terakhir_pesan_at = latest.terakhir_pesan_at
+        where id = keep_id;
+    end;
+  end loop;
+end $$;
+
+drop index if exists public.percakapan_unik;
+create unique index if not exists percakapan_pasangan_unik
+  on public.percakapan (buyer_auth_id, seller_auth_id);
 create index if not exists percakapan_buyer_idx  on public.percakapan (buyer_auth_id, terakhir_pesan_at desc);
 create index if not exists percakapan_seller_idx on public.percakapan (seller_auth_id, terakhir_pesan_at desc);
 
