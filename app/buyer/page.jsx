@@ -5,9 +5,17 @@ import Footer from '@/components/Footer';
 import SapaanNama from '@/components/SapaanNama';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 // Ubah fungsi ini kalau rute halaman Material Detail di aplikasimu berbeda.
 const hrefDetail = (m) => `/katalog/${m.id_material}`;
+
+// Material yang ingin tampil di Beranda (id_material). ID pertama jadi kartu besar.
+// 63 = Botol PET Bekas (Margomulyo), 33 = Serbuk gergaji kayu (Singosari).
+// Kosongkan [] kalau mau otomatis (stok terbanyak).
+const ID_PILIHAN = [63, 33];
+// id_material yang tidak boleh tampil di Beranda. 4 = Botol PET lama yang belum punya foto.
+const ID_DISEMBUNYIKAN = [4];
 
 // Material populer + jumlah material, dibaca di server dari tabel `material`.
 // Kunci Supabase tidak sampai ke browser.
@@ -17,13 +25,21 @@ async function getData() {
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!url || !key) return { total: null, populer: [] };
 
-    const admin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+    const admin = createClient(url, key, {
+      auth: { persistSession: false, autoRefreshToken: false },
+      // Paksa selalu ambil data terbaru dari Supabase, jangan dari cache Next.js.
+      global: { fetch: (input, init) => fetch(input, { ...init, cache: 'no-store' }) },
+    });
     const { data, error } = await admin.from('material').select('*').limit(2000);
     if (error || !data) return { total: null, populer: [] };
 
     const tersedia = data.filter((m) => m.status_material !== false && Number(m.stok) > 0);
-    // Belum ada metrik "populer" di database, jadi sementara diambil dari stok terbanyak.
-    const populer = [...tersedia].sort((a, b) => Number(b.stok) - Number(a.stok)).slice(0, 4);
+    const layak = tersedia.filter((m) => !ID_DISEMBUNYIKAN.includes(m.id_material));
+    const urutStok = [...layak].sort((a, b) => Number(b.stok) - Number(a.stok));
+    // Pilihan manual dulu (sesuai urutan ID_PILIHAN), sisanya diisi otomatis dari stok terbanyak.
+    const manual = ID_PILIHAN.map((id) => layak.find((m) => m.id_material === id)).filter(Boolean);
+    const sisa = urutStok.filter((m) => !manual.includes(m));
+    const populer = [...manual, ...sisa].slice(0, 4);
     return { total: tersedia.length, populer };
   } catch {
     return { total: null, populer: [] };
