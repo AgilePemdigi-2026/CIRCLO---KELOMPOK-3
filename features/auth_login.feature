@@ -27,8 +27,8 @@ Feature: Login Pengguna
     And I fill the login email with "government@circlo.test"
     And I fill the login password with "gov123"
     And I submit the login form
-    Then I should be on "/government"
-    And I should see "Dashboard Pemerintah"
+    Then I should be on "/monitoring"
+    And I should see the heading "Monitoring Ekosistem"
 
   Scenario: Login gagal karena kredensial salah
     Given I am not logged in
