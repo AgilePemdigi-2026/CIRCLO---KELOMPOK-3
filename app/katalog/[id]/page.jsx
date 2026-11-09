@@ -4,8 +4,10 @@ import { createClient } from "@supabase/supabase-js";
 import Navbar from "@/components/Navbar";
 import MaterialImage from "@/components/MaterialImage";
 import MaterialOrderPanel from "@/components/MaterialOrderPanel";
+import bddFixtures from "@/lib/bdd/fixtures.json";
 
 export const dynamic = "force-dynamic";
+const BDD_DEMO = process.env.BDD_DEMO === "1";
 
 const angka = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 2 });
 const rupiah = (n) => `Rp${angka.format(Number(n))}`;
@@ -69,28 +71,52 @@ export default async function MaterialDetailPage({ params }) {
   const id = Number(params.id);
   if (!Number.isInteger(id) || id <= 0) notFound();
 
-  const admin = adminClient();
-  const m = await getMaterial(admin, id);
-  if (!m) notFound();
+  let m;
+  let seller = null;
+  let rekomendasi = [];
 
-// Mengambil informasi toko berdasarkan ID seller material
-let seller = null;
+  if (BDD_DEMO) {
+    m = bddFixtures.materials.find((item) => Number(item.id_material) === id);
+    if (!m) notFound();
 
-if (m.id_seller != null) {
-  const { data: sellerData, error: sellerError } = await admin
-    .from("penjual")
-    .select("id_seller, nama_seller, email_seller, status_seller")
-    .eq("id_seller", m.id_seller)
-    .maybeSingle();
+    seller =
+      bddFixtures.sellers.find((item) => Number(item.id_seller) === Number(m.id_seller)) || null;
 
-  if (sellerError) {
-    console.error("Gagal mengambil detail toko:", sellerError.message);
+    if (!tersedia(m)) {
+      const sekategori = bddFixtures.materials.filter(
+        (item) =>
+          Number(item.id_material) !== id &&
+          tersedia(item) &&
+          item.kategori === m.kategori
+      );
+      rekomendasi = (sekategori.length > 0
+        ? sekategori
+        : bddFixtures.materials.filter((item) => Number(item.id_material) !== id && tersedia(item))
+      ).slice(0, 3);
+    }
   } else {
-    seller = sellerData;
+    const admin = adminClient();
+    m = await getMaterial(admin, id);
+    if (!m) notFound();
+
+    if (m.id_seller != null) {
+      const { data: sellerData, error: sellerError } = await admin
+        .from("penjual")
+        .select("id_seller, nama_seller, email_seller, status_seller")
+        .eq("id_seller", m.id_seller)
+        .maybeSingle();
+
+      if (sellerError) {
+        console.error("Gagal mengambil detail toko:", sellerError.message);
+      } else {
+        seller = sellerData;
+      }
+    }
+
+    if (!tersedia(m)) rekomendasi = await getRekomendasi(admin, m);
   }
-}
+
   const ada = tersedia(m);
-  const rekomendasi = ada ? [] : await getRekomendasi(admin, m);
 
   const lokasi = m.lokasi || [m.kota, m.provinsi].filter(Boolean).join(", ");
 

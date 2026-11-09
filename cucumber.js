@@ -1,5 +1,6 @@
-// Konfigurasi Cucumber. Jalankan server dengan data demo dulu (npm run dev:chat-demo),
-// atau pakai: npm run test:chat (server dijalankan otomatis).
+// Konfigurasi Cucumber. Untuk menjalankan seluruh suite, pakai npm run test:bdd
+// (server BDD dijalankan otomatis). Untuk server sendiri, jalankan dengan
+// CHAT_DEMO=1 BDD_DEMO=1 NEXT_PUBLIC_BDD_DEMO=1 lalu npm run test:bdd:raw.
 module.exports = {
   default: {
     paths: ['features/**/*.feature'],

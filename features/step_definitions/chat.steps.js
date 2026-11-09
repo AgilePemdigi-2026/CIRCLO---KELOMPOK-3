@@ -31,6 +31,9 @@ const attr = (name) => name.replace(/["\\]/g, '\\$&');
 Given('I am on {string}', async function (path) {
   const target = path === '/dashboard' ? DASHBOARD[this.role] : path;
   await this.page.goto(`${this.baseUrl}${target}`, { waitUntil: 'domcontentloaded' });
+  // Tunggu hidrasi React selesai agar klik tidak memicu submit form native.
+  await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+  await this.page.waitForTimeout(300);
 });
 
 When('I follow {string}', async function (text) {
@@ -51,6 +54,7 @@ When('I fill in {string} with {string}', async function (field, value) {
   const p = this.page;
   const input = await waitFor([
     p.getByLabel(field, { exact: true }),
+    p.getByLabel(field),
     p.locator(`[name="${attr(field)}"]`),
     p.locator(`[id="${attr(field)}"]`),
     p.getByPlaceholder(field),
@@ -61,13 +65,14 @@ When('I fill in {string} with {string}', async function (field, value) {
 
 When('I press {string}', async function (label) {
   const p = this.page;
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const button = await waitFor([
     p.getByRole('button', { name: label, exact: true }),
+    p.getByRole('button', { name: new RegExp(`^${escaped}\\b`, 'i') }),
     p.locator(`button[name="${attr(label)}"]`),
     p.locator(`button[id="${attr(label)}"]`),
     p.getByTitle(label, { exact: true }),
-    p.getByText(label, { exact: true }),
-  ]);
+  ]) || await waitFor([p.getByText(label, { exact: true })]);
   if (!button) throw new Error(`Tombol "${label}" tidak ditemukan di ${p.url()}`);
   await button.click();
 });

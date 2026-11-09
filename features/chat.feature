@@ -3,6 +3,7 @@
 # disebut di judul skenario (koneksi terputus / ada pesan gagal yang menunggu dikirim ulang).
 # Dijalankan untuk role Buyer dan Seller (CHAT_ROLE=buyer|seller).
 
+@chat
 Feature: Chat Buyer-Seller
   As a Buyer or Seller, I want to communicate through the chat feature so that I can discuss materials or orders with the other party.
 

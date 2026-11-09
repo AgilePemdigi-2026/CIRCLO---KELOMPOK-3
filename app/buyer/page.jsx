@@ -3,9 +3,12 @@ import { createClient } from '@supabase/supabase-js';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import SapaanNama from '@/components/SapaanNama';
+import bddFixtures from '@/lib/bdd/fixtures.json';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+const BDD_DEMO = process.env.BDD_DEMO === '1';
 
 // Ubah fungsi ini kalau rute halaman Material Detail di aplikasimu berbeda.
 const hrefDetail = (m) => `/katalog/${m.id_material}`;
@@ -20,6 +23,16 @@ const ID_DISEMBUNYIKAN = [4];
 // Material populer + jumlah material, dibaca di server dari tabel `material`.
 // Kunci Supabase tidak sampai ke browser.
 async function getData() {
+  if (BDD_DEMO) {
+    const tersedia = bddFixtures.materials.filter(
+      (m) => m.status_material !== false && Number(m.stok) > 0
+    );
+    const populer = [...tersedia]
+      .sort((a, b) => Number(b.stok) - Number(a.stok))
+      .slice(0, 4);
+    return { total: tersedia.length, populer };
+  }
+
   try {
     const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
