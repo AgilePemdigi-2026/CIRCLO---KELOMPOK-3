@@ -28,9 +28,51 @@ create table if not exists public.percakapan (
   check (buyer_auth_id <> seller_auth_id)
 );
 
--- Satu percakapan per pasangan buyer-seller per material (material boleh kosong).
-create unique index if not exists percakapan_unik
-  on public.percakapan (buyer_auth_id, seller_auth_id, coalesce(id_material, -1));
+-- Satu percakapan per pasangan buyer-seller, seperti satu kontak di WhatsApp. Kolom id_material hanya
+-- menyimpan material terakhir yang dibahas (untuk kartu material di ruang chat), bukan bagian dari kunci.
+-- Versi lama membuat percakapan baru untuk tiap material, jadi data lama digabung dulu: pesan dipindah ke
+-- percakapan tertua milik pasangan itu, lalu material dan pratinjau pesan diambil dari yang paling baru aktif.
+-- Aman dijalankan berulang.
+do $$
+declare
+  p record;
+begin
+  for p in
+    select buyer_auth_id, seller_auth_id from public.percakapan
+    group by buyer_auth_id, seller_auth_id having count(*) > 1
+  loop
+    declare
+      keep_id uuid;
+      latest  public.percakapan%rowtype;
+    begin
+      select id into keep_id from public.percakapan
+        where buyer_auth_id = p.buyer_auth_id and seller_auth_id = p.seller_auth_id
+        order by dibuat_pada, id limit 1;
+      select * into latest from public.percakapan
+        where buyer_auth_id = p.buyer_auth_id and seller_auth_id = p.seller_auth_id
+        order by terakhir_pesan_at desc, id limit 1;
+
+      -- client_id dikosongkan pada pesan yang dipindah supaya tidak bentrok dengan indeks unik per percakapan.
+      update public.pesan_chat set id_percakapan = keep_id, client_id = null
+        where id_percakapan in (
+          select id from public.percakapan
+          where buyer_auth_id = p.buyer_auth_id and seller_auth_id = p.seller_auth_id and id <> keep_id);
+
+      delete from public.percakapan
+        where buyer_auth_id = p.buyer_auth_id and seller_auth_id = p.seller_auth_id and id <> keep_id;
+
+      update public.percakapan
+        set id_material = latest.id_material,
+            terakhir_pesan = latest.terakhir_pesan,
+            terakhir_pesan_at = latest.terakhir_pesan_at
+        where id = keep_id;
+    end;
+  end loop;
+end $$;
+
+drop index if exists public.percakapan_unik;
+create unique index if not exists percakapan_pasangan_unik
+  on public.percakapan (buyer_auth_id, seller_auth_id);
 create index if not exists percakapan_buyer_idx  on public.percakapan (buyer_auth_id, terakhir_pesan_at desc);
 create index if not exists percakapan_seller_idx on public.percakapan (seller_auth_id, terakhir_pesan_at desc);
 
@@ -48,6 +90,29 @@ create table if not exists public.pesan_chat (
 create unique index if not exists pesan_chat_client_unik
   on public.pesan_chat (id_percakapan, client_id) where client_id is not null;
 create index if not exists pesan_chat_riwayat_idx on public.pesan_chat (id_percakapan, dibuat_pada);
+
+-- Status pesan:
+--   diterima_pada kosong                  -> 1 centang (terkirim, belum diterima: jaringan lawan buruk atau aplikasinya belum dibuka)
+--   diterima_pada terisi                  -> 2 centang abu-abu (diterima, belum dibuka)
+--   dibaca_pada terisi                    -> 2 centang biru (dibaca: ruang percakapan terbuka di layar penerima)
+-- Pesan lama (sebelum kolom ada) dianggap sudah diterima dan dibaca. Aman dijalankan berulang.
+do $$
+begin
+  if not exists (select 1 from information_schema.columns
+                 where table_schema = 'public' and table_name = 'pesan_chat' and column_name = 'diterima_pada') then
+    alter table public.pesan_chat add column diterima_pada timestamptz;
+    update public.pesan_chat set diterima_pada = dibuat_pada where diterima_pada is null;
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (select 1 from information_schema.columns
+                 where table_schema = 'public' and table_name = 'pesan_chat' and column_name = 'dibaca_pada') then
+    alter table public.pesan_chat add column dibaca_pada timestamptz;
+    update public.pesan_chat set dibaca_pada = dibuat_pada where dibaca_pada is null;
+  end if;
+end $$;
 
 -- Tabel hanya diakses lewat API server (service role), jadi RLS dinyalakan tanpa policy publik.
 alter table public.percakapan enable row level security;

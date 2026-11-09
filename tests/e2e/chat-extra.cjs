@@ -96,6 +96,50 @@ t('role Government ditolak dari halaman chat', async (b) => {
   await p.getByText('Halaman ini khusus Buyer / Seller').waitFor();
 });
 
+t('centang: 1 centang saat terkirim, jadi 2 centang biru setelah Seller membuka ruang percakapan', async (b) => {
+  const buyer = await open(b, 'buyer');
+  const log = buyer.page.getByRole('log', { name: 'Riwayat Pesan' });
+  await buyer.page.getByLabel('Ketik pesan').fill('Cek centang');
+  await buyer.page.locator('#Send').click();
+  await log.getByRole('img', { name: 'Terkirim' }).waitFor(); // 1 centang: Seller belum membuka aplikasi
+  assert.equal(await log.getByRole('img', { name: 'Dibaca' }).count(), 1); // hanya riwayat awal
+  await open(b, 'seller'); // Seller membuka aplikasi dan ruang percakapan terlihat di layar (1280 px)
+  await log.getByRole('img', { name: 'Dibaca' }).nth(1).waitFor({ timeout: 12000 }); // polling Buyer tiap 5 detik
+  assert.equal(await log.getByRole('img', { name: 'Terkirim' }).count(), 0);
+});
+
+t('centang: 2 centang abu-abu bila Seller hanya melihat daftar percakapan (layar HP), biru setelah ruang dibuka', async (b) => {
+  const buyer = await open(b, 'buyer');
+  const log = buyer.page.getByRole('log', { name: 'Riwayat Pesan' });
+  await buyer.page.getByLabel('Ketik pesan').fill('Cek abu-abu');
+  await buyer.page.locator('#Send').click();
+  await log.getByRole('img', { name: 'Terkirim' }).waitFor();
+  const ctx = await b.newContext({ viewport: { width: 390, height: 800 } });
+  await ctx.addInitScript(() => localStorage.setItem('circlo:dev-role', 'seller'));
+  const p = await ctx.newPage();
+  await p.goto(`${BASE}/chat`);
+  const row = p.getByRole('link', { name: /Pembeli Demo/ });
+  await row.waitFor(); // Seller hanya melihat daftar
+  await log.getByRole('img', { name: 'Diterima' }).waitFor({ timeout: 12000 }); // abu-abu: diterima, belum dibaca
+  assert.equal(await log.getByRole('img', { name: 'Dibaca' }).count(), 1); // hanya riwayat awal
+  await row.click(); // Seller membuka ruang percakapan
+  await log.getByRole('img', { name: 'Dibaca' }).nth(1).waitFor({ timeout: 12000 });
+});
+
+t('jaringan putus: "Coba Lagi" muncul, lalu pesan terkirim satu kali dengan centang', async (b) => {
+  const { ctx, page } = await open(b, 'buyer');
+  const log = page.getByRole('log', { name: 'Riwayat Pesan' });
+  await ctx.setOffline(true);
+  await page.getByLabel('Ketik pesan').fill('Pesan saat offline');
+  await page.locator('#Send').click();
+  await page.getByText('Pesan gagal dikirim').waitFor();
+  await ctx.setOffline(false);
+  await page.getByRole('button', { name: 'Coba Lagi' }).click();
+  await log.getByRole('img', { name: 'Terkirim' }).waitFor();
+  assert.equal(await page.getByText('Pesan gagal dikirim').count(), 0);
+  assert.equal(await log.getByText('Pesan saat offline').count(), 1);
+});
+
 (async () => {
   const browser = await chromium.launch(); let failed = 0;
   for (const [name, fn] of tests) {

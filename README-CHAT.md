@@ -40,3 +40,20 @@ Tanpa `CHAT_DEMO=1` dan dengan Supabase terpasang, halaman memakai data asli dan
 - Hubungi Seller: tautan membuka `/chat?material=<id>` dan percakapan langsung terbuka. Kalau seller material belum punya
   `auth_user_id` di tabel `penjual`, halaman chat menampilkan alasannya (hubungkan akun seller dulu). Buyer dan Seller
   harus memakai dua akun berbeda.
+
+## Status pesan (centang) dan Coba Lagi
+Berlaku untuk pesan milik pengirim sendiri, di Buyer maupun Seller.
+- **1 centang** (Terkirim): pesan sudah tersimpan di server, tetapi belum diterima aplikasi lawan bicara (jaringannya buruk atau aplikasinya belum dibuka).
+- **2 centang abu-abu** (Diterima): aplikasi lawan bicara sudah memuat pesan itu, tetapi ruang percakapannya belum dibuka (misalnya hanya daftar percakapan yang terlihat).
+- **2 centang biru** (Dibaca): ruang percakapan terbuka di layar lawan bicara, dengan tab aktif. Di layar HP, ruang yang tersembunyi di balik daftar tidak dihitung dibaca.
+Status diperbarui lewat polling 5 detik yang sudah ada, jadi perubahan centang bisa muncul dengan jeda sampai 5 detik.
+- **Mengirim…** (ikon jam): permintaan kirim masih berjalan.
+- **Pesan gagal dikirim + tombol Coba Lagi**: jaringan putus, perangkat offline, atau tidak ada respons dalam 15 detik. Pesan disimpan di perangkat sehingga tombol tetap ada setelah halaman dimuat ulang. Coba Lagi memakai `client_id` yang sama, jadi pesan tidak menjadi ganda walau sebenarnya sudah sampai di server.
+
+Cara kerja di server: kolom baru `pesan_chat.diterima_pada` terisi saat penerima memuat daftar percakapan atau ruang percakapan, dan `pesan_chat.dibaca_pada` terisi saat klien penerima meminta ruang percakapan dengan `GET /api/percakapan/:id/pesan?read=1` (hanya dikirim bila ruangnya terlihat di layar).
+Jalankan ulang `supabase/chat.sql` sekali di SQL Editor Supabase (aman diulang; pesan lama dianggap sudah diterima dan dibaca).
+Sebelum kolom itu dibuat, chat tetap berjalan tetapi centang tidak naik dari satu ke dua (kolom `diterima_pada`) atau tidak berubah biru (kolom `dibaca_pada`).
+
+## Zona waktu
+Server menyimpan waktu pesan sebagai UTC. Tampilan jam, label "Hari Ini"/"Kemarin", dan pengelompokan hari memakai zona waktu perangkat masing-masing, jadi Buyer di Bali melihat WITA dan Seller di Surabaya melihat WIB untuk pesan yang sama.
+Arahkan kursor ke jam pesan untuk melihat singkatannya (misalnya "11:42 WITA"). Di luar Indonesia tampil seperti "GMT+8".

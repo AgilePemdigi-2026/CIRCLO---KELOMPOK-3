@@ -66,3 +66,12 @@ test('reset mengembalikan data awal', async () => {
   const after = await (await room.GET(req('/api/percakapan/c-siti/pesan'), ctx('c-siti'))).json();
   assert.equal(after.messages.length, 1);
 });
+
+test('GET ?read=1 menandai pesan lawan dibaca; tanpa read=1 hanya diterima', async () => {
+  await room.POST(req('/api/percakapan/c-ecotextile/pesan', { method: 'POST', body: { text: 'Cek read', client_id: 'api-r1' } }), ctx('c-ecotextile'));
+  const buyerView = async () => (await (await room.GET(req('/api/percakapan/c-ecotextile/pesan'), ctx('c-ecotextile'))).json()).messages.find((m) => m.text === 'Cek read');
+  await room.GET(req('/api/percakapan/c-ecotextile/pesan', { role: 'seller' }), ctx('c-ecotextile'));
+  assert.deepEqual([(await buyerView()).delivered, (await buyerView()).read], [true, false]);
+  await room.GET(req('/api/percakapan/c-ecotextile/pesan?read=1', { role: 'seller' }), ctx('c-ecotextile'));
+  assert.deepEqual([(await buyerView()).delivered, (await buyerView()).read], [true, true]);
+});

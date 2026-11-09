@@ -8,7 +8,8 @@ export function fakeSupabase(seed = {}, { missingColumns = {} } = {}) {
   const from = (table) => {
     const st = { cols: '*', op: 'select', payload: null, filters: [], order: null, limit: null, one: null };
     const run = () => {
-      const missing = (missingColumns[table] || []).find((c) => st.cols.split(',').map((x) => x.trim()).includes(c));
+      const touched = st.op === 'update' ? Object.keys(st.payload || {}) : st.cols.split(',').map((x) => x.trim());
+      const missing = (missingColumns[table] || []).find((c) => touched.includes(c));
       if (missing) return { data: null, error: { code: '42703', message: `column ${table}.${missing} does not exist` } };
       let rows = db[table].filter((r) => st.filters.every((f) => f(r)));
       if (st.op === 'insert') {
@@ -33,6 +34,8 @@ export function fakeSupabase(seed = {}, { missingColumns = {} } = {}) {
       insert: (p) => { st.op = 'insert'; st.payload = p; return q; },
       update: (p) => { st.op = 'update'; st.payload = p; return q; },
       eq: (c, v) => { st.filters.push((r) => r[c] === v); return q; },
+      neq: (c, v) => { st.filters.push((r) => r[c] !== v); return q; },
+      in: (c, values) => { st.filters.push((r) => values.includes(r[c])); return q; },
       is: (c, v) => { st.filters.push((r) => (r[c] ?? null) === v); return q; },
       or: (expr) => {
         const parts = expr.split(',').map((s) => s.split('.'));

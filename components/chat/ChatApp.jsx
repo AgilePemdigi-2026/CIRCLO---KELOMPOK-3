@@ -20,6 +20,13 @@ export default function ChatApp() {
   const [needsLogin, setNeedsLogin] = useState(false);
   const activeId = useRef(null);
   const localRef = useRef([]);
+  const showRoomRef = useRef(false);
+  useEffect(() => {
+    showRoomRef.current = showRoom;
+  }, [showRoom]);
+
+  // Pesan baru dianggap dibaca hanya bila ruang percakapan terlihat: tab sedang aktif, dan (di layar kecil) ruangnya sedang dibuka, bukan daftar.
+  const roomIsVisible = () => document.visibilityState === 'visible' && (showRoomRef.current || Boolean(window.matchMedia?.('(min-width: 1024px)').matches));
 
   const updateLocal = useCallback((fn) => {
     const next = fn(localRef.current);
@@ -47,7 +54,7 @@ export default function ChatApp() {
   const loadRoom = useCallback(async (id, { silent = false } = {}) => {
     if (!silent) setRoom({ loading: true, data: null, error: null });
     try {
-      const data = await fetchRoom(id, role);
+      const data = await fetchRoom(id, role, { read: roomIsVisible() });
       if (activeId.current === id) setRoom({ loading: false, data, error: null });
     } catch (e) {
       if (activeId.current !== id) return;
@@ -117,10 +124,14 @@ export default function ChatApp() {
   const send = useCallback(async (text, existing) => {
     if (!selectedId) return;
     const convId = selectedId;
+    // Perangkat jelas-jelas offline: tidak perlu menunggu permintaan gagal, langsung tampilkan "Coba Lagi".
+    const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+    const status = offline ? 'failed' : 'sending';
     const item = existing
-      ? { ...existing, status: 'sending' }
-      : { client_id: newClientId(), conversation_id: convId, text, created_at: new Date().toISOString(), status: 'sending' };
+      ? { ...existing, status }
+      : { client_id: newClientId(), conversation_id: convId, text, created_at: new Date().toISOString(), status };
     updateLocal((prev) => (existing ? prev.map((i) => (i.client_id === item.client_id ? item : i)) : [...prev, item]));
+    if (offline) return;
     try {
       const { message } = await postMessage(convId, { text: item.text, client_id: item.client_id }, role);
       updateLocal((prev) => prev.filter((i) => i.client_id !== item.client_id));
@@ -134,13 +145,24 @@ export default function ChatApp() {
     }
   }, [selectedId, role, updateLocal, loadList, onApiError]);
 
+  // Pesan yang ternyata sudah masuk ke server (jaringan putus tepat setelah terkirim) tidak perlu lagi
+  // menunggu "Coba Lagi": hapus dari outbox supaya tidak tersisa di perangkat.
+  useEffect(() => {
+    const server = room.data?.messages;
+    if (!server?.length) return;
+    const known = new Set(server.map((m) => m.client_id).filter(Boolean));
+    if (localRef.current.some((i) => known.has(i.client_id))) updateLocal((prev) => prev.filter((i) => !known.has(i.client_id)));
+  }, [room.data, updateLocal]);
+
   const messages = useMemo(() => {
     const server = room.data?.messages || [];
     const known = new Set(server.map((m) => m.client_id).filter(Boolean));
     const pending = local
       .filter((i) => i.conversation_id === selectedId && !known.has(i.client_id))
       .map((i) => ({ ...i, key: `local-${i.client_id}`, mine: true }));
-    return [...server.map((m) => ({ ...m, status: 'sent', key: m.id })), ...pending];
+    // Pesan milik sendiri: 'sent' = 1 centang, 'delivered' = 2 centang abu-abu, 'read' = 2 centang biru.
+    const status = (m) => (!m.mine ? 'received' : m.read ? 'read' : m.delivered ? 'delivered' : 'sent');
+    return [...server.map((m) => ({ ...m, status: status(m), key: m.id })), ...pending];
   }, [room.data, local, selectedId]);
 
   if (needsLogin) {
@@ -154,7 +176,7 @@ export default function ChatApp() {
   }
 
   return (
-    <main className="flex h-[calc(100vh-81px)] min-h-[560px] border-t border-circlo-line/60">
+    <main className="flex min-h-0 flex-1 overflow-hidden border-t border-circlo-line/60">
       <ConversationList
         items={list.items}
         selectedId={selectedId}
