@@ -1,7 +1,10 @@
+
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Script from "next/script";
+import { Check } from "lucide-react";
 import { getAccessToken } from "@/lib/auth";
 
 import JumlahPesananStep from "./JumlahPesananStep";
@@ -9,7 +12,6 @@ import AlamatPengirimanStep, {
   validateAlamat,
 } from "./AlamatPengirimanStep";
 import PembayaranStep from "./PembayaranStep";
-import { Check } from "lucide-react";
 
 const steps = ["Jumlah Pesanan", "Alamat", "Pembayaran"];
 
@@ -20,15 +22,52 @@ const rupiah = (value) =>
     maximumFractionDigits: 0,
   }).format(Number(value) || 0);
 
+// JWT hanya dibaca untuk memisahkan
+// sessionStorage masing-masing Buyer.
+// Otorisasi tetap diperiksa oleh backend.
+function buyerIdDariToken(token) {
+  try {
+    const encoded = token.split(".")[1];
+
+    if (!encoded) return null;
+
+    const base64 = encoded
+      .replace(/-/g, "+")
+      .replace(/_/g, "/");
+
+    const padded = base64.padEnd(
+      Math.ceil(base64.length / 4) * 4,
+      "="
+    );
+
+    const payload = JSON.parse(window.atob(padded));
+
+    return typeof payload.sub === "string" && payload.sub
+      ? payload.sub
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function CheckoutFlow() {
   const router = useRouter();
 
+  // STATE UTAMA
   const [step, setStep] = useState(0);
   const [material, setMaterial] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [showAlamatErrors, setShowAlamatErrors] = useState(false);
+  const [showAlamatErrors, setShowAlamatErrors] =
+    useState(false);
 
+  // REFERENSI CHECKOUT
+  const pesananAktifRef = useRef(null);
+  const prosesAktifRef = useRef(false);
+  const checkoutRequestIdRef = useRef(null);
+  const checkoutStorageKeyRef = useRef(null);
+
+  // DATA CHECKOUT
   const [data, setData] = useState({
     jumlah: 1,
     metodeKirim: "Dikirim",
@@ -38,19 +77,18 @@ export default function CheckoutFlow() {
     kota: "",
     provinsi: "",
     kodePos: "",
-    metodePembayaran: "Virtual Account",
-    bank: "BRI",
   });
 
-  // Mengambil data material dari URL
+  // 1. MENGAMBIL MATERIAL DARI URL
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(
+      window.location.search
+    );
 
     const id = Number(params.get("id"));
     const harga = Number(params.get("harga"));
     const stok = Number(params.get("stok"));
     const jumlahDariCart = Number(params.get("jumlah"));
-
 
     if (
       !Number.isInteger(id) ||
@@ -58,22 +96,40 @@ export default function CheckoutFlow() {
       !Number.isFinite(harga) ||
       harga < 0 ||
       !Number.isFinite(stok) ||
-      stok <= 0
+      stok < 0
     ) {
       return;
     }
 
     setMaterial({
       id_material: id,
-      nama_material: params.get("nama") || "Material",
+      nama_material:
+        params.get("nama") || "Material",
       harga,
       stok,
       satuan: params.get("satuan") || "unit",
     });
+
+    if (
+      Number.isInteger(jumlahDariCart) &&
+      jumlahDariCart > 0
+    ) {
+      setData((prev) => ({
+        ...prev,
+        jumlah: jumlahDariCart,
+      }));
+    }
   }, []);
 
-  // Memperbarui data checkout
+  // 2. MEMPERBARUI DATA CHECKOUT
   const update = (patch) => {
+    if (pesananAktifRef.current !== null) {
+      setError(
+        "Pesanan sudah tercatat. Jangan mengubah detailnya selama pembayaran masih berlangsung. Periksa Pesanan Saya jika ingin membatalkan."
+      );
+      return;
+    }
+
     setData((prev) => ({
       ...prev,
       ...patch,
@@ -98,20 +154,21 @@ export default function CheckoutFlow() {
       ? jumlah * material.harga
       : 0;
 
-  // Validasi jumlah dan metode pengiriman
+  // 3. VALIDASI JUMLAH DAN PENGIRIMAN
   const validasiJumlah = () => {
     if (!material) {
       return "Pilih material terlebih dahulu.";
     }
 
-    if (!Number.isInteger(jumlah) || jumlah <= 0) {
+    if (
+      !Number.isInteger(jumlah) ||
+      jumlah <= 0
+    ) {
       return "Jumlah pesanan harus berupa bilangan bulat lebih dari 0.";
     }
 
-    if (jumlah > material.stok) {
-      return `Stok hanya tersedia ${material.stok} ${material.satuan}.`;
-    }
-
+    // Stok diperiksa kembali oleh API Orders.
+    // Pemeriksaan pesanan lama dilakukan lebih dahulu.
     if (
       !["Dikirim", "Ambil di tempat"].includes(
         data.metodeKirim
@@ -123,12 +180,12 @@ export default function CheckoutFlow() {
     return "";
   };
 
-  // Validasi alamat menggunakan validator bersama
+  // 4. VALIDASI ALAMAT
   const validasiAlamat = () => {
     return validateAlamat(data);
   };
 
-  // Menggabungkan alamat menjadi satu string untuk API
+  // 5. MEMBUAT ALAMAT LENGKAP
   const alamatLengkap = () => {
     if (data.metodeKirim === "Ambil di tempat") {
       return "";
@@ -144,7 +201,7 @@ export default function CheckoutFlow() {
     ].join(", ");
   };
 
-  // Tombol lanjut
+  // 6. TOMBOL LANJUT
   const lanjut = () => {
     setError("");
 
@@ -173,15 +230,15 @@ export default function CheckoutFlow() {
     setStep((prev) => Math.min(prev + 1, 2));
   };
 
-  // Tombol kembali
+  // 7. TOMBOL KEMBALI
   const kembali = () => {
     setError("");
     setStep((prev) => Math.max(prev - 1, 0));
   };
 
-  // Membuat pesanan melalui API
+  // 8. MEMBUAT PESANAN DAN MEMBUKA MIDTRANS
   const buatPesanan = async () => {
-    if (loading) return;
+    if (loading || prosesAktifRef.current) return;
 
     const errorJumlah = validasiJumlah();
 
@@ -202,23 +259,23 @@ export default function CheckoutFlow() {
       return;
     }
 
-    if (!data.metodePembayaran) {
-      setError("Pilih metode pembayaran.");
-      return;
-    }
-
+    // Pastikan Snap.js sudah siap
     if (
-      data.metodePembayaran === "Virtual Account" &&
-      !["BCA", "BNI", "BRI", "Mandiri"].includes(data.bank)
+      typeof window === "undefined" ||
+      typeof window.snap?.pay !== "function"
     ) {
-      setError("Pilih bank Virtual Account yang valid.");
+      setError(
+        "Midtrans belum siap. Tunggu halaman selesai dimuat lalu coba kembali."
+      );
       return;
     }
 
+    prosesAktifRef.current = true;
     setLoading(true);
     setError("");
 
     try {
+      // 8A. MEMERIKSA LOGIN BUYER
       const token = await getAccessToken();
 
       if (!token) {
@@ -227,58 +284,309 @@ export default function CheckoutFlow() {
         );
       }
 
-      const response = await fetch("/api/orders", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          id_material: material.id_material,
-          kuantitas: jumlah,
-          metode_kirim: data.metodeKirim,
-          alamat: alamatLengkap(),
-        }),
-      });
+      const buyerId = buyerIdDariToken(token);
 
-      const result = await response
-        .json()
-        .catch(() => ({}));
-
-      if (!response.ok) {
+      if (!buyerId) {
         throw new Error(
-          result.error || "Gagal membuat pesanan."
+          "Identitas Buyer tidak ditemukan. Silakan login kembali."
         );
       }
 
-      if (!result.id_pesanan) {
-        throw new Error("ID pesanan tidak ditemukan.");
+      // 8B. ID CHECKOUT BERDASARKAN BUYER
+      // Hanya satu checkoutStorageKey di fungsi ini.
+      const checkoutStorageKey =
+        `circlo:checkout:buyer:${buyerId}:material:${material.id_material}`;
+
+      // Reset referensi jika akun atau material berubah
+      if (
+        checkoutStorageKeyRef.current !==
+        checkoutStorageKey
+      ) {
+        checkoutStorageKeyRef.current =
+          checkoutStorageKey;
+
+        checkoutRequestIdRef.current = null;
+        pesananAktifRef.current = null;
       }
 
-      // Setelah pesanan berhasil, menuju Pesanan Saya
-      router.push("/orders");
-      router.refresh();
+      // 8C. AMBIL ATAU BUAT ID CHECKOUT
+      let checkoutRequestId =
+        checkoutRequestIdRef.current ||
+        window.sessionStorage.getItem(
+          checkoutStorageKey
+        );
+
+      if (!checkoutRequestId) {
+        checkoutRequestId =
+          window.crypto.randomUUID();
+
+        window.sessionStorage.setItem(
+          checkoutStorageKey,
+          checkoutRequestId
+        );
+      }
+
+      checkoutRequestIdRef.current =
+        checkoutRequestId;
+
+      // 8D. GUNAKAN PESANAN SEBELUMNYA JIKA ADA
+      let idPesanan = pesananAktifRef.current;
+
+      if (!idPesanan) {
+        const response = await fetch(
+          "/api/orders",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              id_material:
+                material.id_material,
+              kuantitas: jumlah,
+              metode_kirim:
+                data.metodeKirim,
+              alamat: alamatLengkap(),
+              checkout_request_id:
+                checkoutRequestId,
+            }),
+          }
+        );
+
+        const result = await response
+          .json()
+          .catch(() => ({}));
+
+        if (!response.ok) {
+          const statusLama = String(
+            result.status_pesanan || ""
+          )
+            .trim()
+            .toLowerCase();
+
+          // Jika pesanan lama sudah tidak aktif,
+          // kosongkan ID Checkout sebelumnya.
+          if (
+            response.status === 409 &&
+            result.id_pesanan &&
+            result.status_pesanan &&
+            statusLama !==
+              "menunggu pembayaran"
+          ) {
+            window.sessionStorage.removeItem(
+              checkoutStorageKey
+            );
+
+            checkoutRequestIdRef.current = null;
+            pesananAktifRef.current = null;
+
+            throw new Error(
+              `Pesanan #${result.id_pesanan} sudah berstatus ` +
+                `${result.status_pesanan}. ` +
+                "Periksa Pesanan Saya terlebih dahulu. " +
+                "Jika ingin membeli lagi, klik Bayar dengan Midtrans sekali lagi."
+            );
+          }
+
+          throw new Error(
+            result.error ||
+              "Gagal membuat pesanan."
+          );
+        }
+
+        idPesanan = Number(
+          result.id_pesanan
+        );
+
+        if (
+          !Number.isSafeInteger(idPesanan) ||
+          idPesanan <= 0
+        ) {
+          throw new Error(
+            "Pesanan dibuat tetapi ID pesanan tidak valid."
+          );
+        }
+
+        // Simpan ID agar popup yang ditutup
+        // tidak menyebabkan pesanan baru.
+        pesananAktifRef.current =
+          idPesanan;
+      }
+
+      // 8E. MEMINTA SNAP TOKEN MIDTRANS
+      const responseBayar = await fetch(
+        "/api/midtrans/checkout",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+            Authorization:
+              `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            id_pesanan: idPesanan,
+          }),
+        }
+      );
+
+      const hasilBayar = await responseBayar
+        .json()
+        .catch(() => ({}));
+
+      if (!responseBayar.ok) {
+        throw new Error(
+          hasilBayar.error ||
+            "Gagal mempersiapkan pembayaran Midtrans."
+        );
+      }
+
+      if (!hasilBayar.snap_token) {
+        throw new Error(
+          "Snap Token Midtrans tidak ditemukan."
+        );
+      }
+
+      setLoading(false);
+
+      // 8F. MEMBUKA POPUP MIDTRANS
+      window.snap.pay(
+        hasilBayar.snap_token,
+        {
+          // PEMBAYARAN BERHASIL
+          onSuccess: async () => {
+            setLoading(true);
+
+            try {
+              // Verifikasi ke server,
+              // bukan hanya callback browser.
+              const responseVerify =
+                await fetch(
+                  "/api/midtrans/verify",
+                  {
+                    method: "POST",
+                    headers: {
+                      "Content-Type":
+                        "application/json",
+                      Authorization:
+                        `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({
+                      id_pesanan:
+                        idPesanan,
+                    }),
+                  }
+                );
+
+              const hasilVerify =
+                await responseVerify
+                  .json()
+                  .catch(() => ({}));
+
+              if (
+                responseVerify.ok &&
+                hasilVerify.lunas === true
+              ) {
+                // Pembayaran sudah terverifikasi.
+                // Bersihkan ID Checkout lokal.
+                window.sessionStorage.removeItem(
+                  checkoutStorageKey
+                );
+
+                checkoutRequestIdRef.current = null;
+                pesananAktifRef.current = null;
+
+                router.push("/orders");
+                router.refresh();
+              } else {
+                setError(
+                  "Pembayaran belum terverifikasi. Periksa statusnya di Pesanan Saya sebelum mencoba lagi."
+                );
+              }
+            } catch {
+              setError(
+                "Status pembayaran belum dapat diperiksa. Silakan cek Pesanan Saya."
+              );
+            } finally {
+              setLoading(false);
+              prosesAktifRef.current =
+                false;
+            }
+          },
+
+          // PEMBAYARAN MASIH PENDING
+          onPending: () => {
+            prosesAktifRef.current =
+              false;
+
+            setLoading(false);
+
+            setError(
+              "Pembayaran masih menunggu penyelesaian. Ikuti instruksi Midtrans dan jangan membuat pesanan baru."
+            );
+          },
+
+          // TERJADI ERROR PEMBAYARAN
+          onError: () => {
+            prosesAktifRef.current =
+              false;
+
+            setLoading(false);
+
+            setError(
+              "Terjadi kendala pembayaran. Periksa status pesanan sebelum mencoba kembali."
+            );
+          },
+
+          // POPUP DITUTUP
+          onClose: () => {
+            prosesAktifRef.current =
+              false;
+
+            setLoading(false);
+
+            setError(
+              "Popup pembayaran ditutup. Pesanan sudah tercatat dan dapat dilanjutkan tanpa membuat pesanan baru."
+            );
+          },
+        }
+      );
     } catch (err) {
+      prosesAktifRef.current = false;
+      setLoading(false);
+
       setError(
         err instanceof Error
           ? err.message
-          : "Terjadi kesalahan saat membuat pesanan."
+          : "Terjadi kesalahan saat memproses pembayaran."
       );
-    } finally {
-      setLoading(false);
     }
   };
 
+  // 9. TAMPILAN CHECKOUT
   return (
     <div className="mt-8 grid gap-6 lg:grid-cols-[2fr_1fr]">
+      {/* SCRIPT MIDTRANS SANDBOX */}
+      <Script
+        src="https://app.sandbox.midtrans.com/snap/snap.js"
+        data-client-key={
+          process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY
+        }
+        strategy="afterInteractive"
+      />
+
       {/* BAGIAN KIRI */}
       <section className="rounded-2xl bg-white p-6 shadow-card sm:p-8">
-        {/* Progress Bar Minimalist */}
+        {/* PROGRESS BAR */}
         <div className="mb-8">
           <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
             {steps.map((nama, index) => {
-              const isCompleted = index < step;
-              const isCurrent = index === step;
+              const isCompleted =
+                index < step;
+
+              const isCurrent =
+                index === step;
 
               return (
                 <button
@@ -292,23 +600,28 @@ export default function CheckoutFlow() {
                   }}
                   disabled={!isCompleted}
                   className={`group flex flex-col items-start text-left transition-all ${
-                    isCompleted ? "cursor-pointer" : "cursor-default"
+                    isCompleted
+                      ? "cursor-pointer"
+                      : "cursor-default"
                   }`}
-                  aria-current={isCurrent ? "step" : undefined}
+                  aria-current={
+                    isCurrent
+                      ? "step"
+                      : undefined
+                  }
                 >
-                  {/* Progress Line Bar */}
                   <div
                     className={`h-1.5 w-full rounded-full transition-all duration-300 ${
-                      isCompleted || isCurrent
+                      isCompleted ||
+                      isCurrent
                         ? "bg-circlo-green"
                         : "bg-circlo-line/50"
                     }`}
                   />
 
-                  {/* Step Label */}
                   <div className="mt-2.5 flex items-center gap-1.5 text-xs sm:text-[13px]">
                     <span
-                      className={`transition-colors leading-tight ${
+                      className={`leading-tight transition-colors ${
                         isCurrent
                           ? "font-semibold text-circlo-green"
                           : isCompleted
@@ -316,11 +629,11 @@ export default function CheckoutFlow() {
                           : "text-circlo-muted/60"
                       }`}
                     >
-                      <span className="inline">{index + 1}. </span>
-                      {nama}
+                      {index + 1}. {nama}
                     </span>
+
                     {isCompleted && (
-                      <Check className="h-3.5 w-3.5 text-circlo-green shrink-0" />
+                      <Check className="h-3.5 w-3.5 shrink-0 text-circlo-green" />
                     )}
                   </div>
                 </button>
@@ -329,10 +642,11 @@ export default function CheckoutFlow() {
           </div>
         </div>
 
+        {/* INFORMASI MATERIAL */}
         {!material && (
           <p className="mb-5 rounded-lg bg-amber-50 p-4 text-sm text-amber-800">
-            Belum ada material dipilih. Silakan pilih
-            material dari Material Catalog.
+            Belum ada material dipilih.
+            Silakan pilih material dari Material Catalog.
           </p>
         )}
 
@@ -358,11 +672,10 @@ export default function CheckoutFlow() {
         {step === 2 && (
           <>
             <PembayaranStep
-              data={data}
-              onChange={update}
               subtotal={subtotal}
             />
 
+            {/* KONFIRMASI PESANAN */}
             <div className="mt-6 rounded-xl border border-green-200 bg-green-50 p-5">
               <h3 className="font-semibold text-green-900">
                 Konfirmasi Pesanan
@@ -376,7 +689,8 @@ export default function CheckoutFlow() {
 
                 <p>
                   <strong>Jumlah:</strong>{" "}
-                  {jumlah} {material?.satuan || "unit"}
+                  {jumlah}{" "}
+                  {material?.satuan || "unit"}
                 </p>
 
                 <p>
@@ -411,10 +725,10 @@ export default function CheckoutFlow() {
                 )}
 
                 <p>
-                  <strong>Metode Pembayaran:</strong>{" "}
-                  {data.metodePembayaran === "Virtual Account"
-                    ? `Virtual Account (${data.bank || "BRI"})`
-                    : "QRIS"}
+                  <strong>
+                    Metode Pembayaran:
+                  </strong>{" "}
+                  Midtrans Sandbox
                 </p>
 
                 <p className="font-bold">
@@ -423,8 +737,13 @@ export default function CheckoutFlow() {
               </div>
             </div>
 
-            <p className="mt-4 rounded-lg bg-amber-50 p-4 text-sm text-amber-800">
-              Mode simulasi: Tombol Buat Pesanan dapat langsung diklik untuk menyelesaikan pesanan tanpa perlu melakukan pembayaran sungguhan.
+            {/* INFORMASI SANDBOX */}
+            <p className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+              Pembayaran dilakukan melalui Midtrans
+              Sandbox. Setelah menekan tombol Bayar
+              dengan Midtrans, pilih metode pembayaran
+              pada popup yang muncul. Jangan melakukan
+              transfer uang sungguhan.
             </p>
           </>
         )}
@@ -444,7 +763,9 @@ export default function CheckoutFlow() {
           <button
             type="button"
             onClick={kembali}
-            disabled={step === 0 || loading}
+            disabled={
+              step === 0 || loading
+            }
             className="rounded-lg border border-gray-300 px-5 py-3 font-medium text-gray-700 disabled:opacity-40"
           >
             Kembali
@@ -454,7 +775,9 @@ export default function CheckoutFlow() {
             <button
               type="button"
               onClick={lanjut}
-              disabled={!material || loading}
+              disabled={
+                !material || loading
+              }
               className="rounded-lg bg-circlo-green px-6 py-3 font-semibold text-white disabled:opacity-50"
             >
               Lanjut
@@ -463,12 +786,14 @@ export default function CheckoutFlow() {
             <button
               type="button"
               onClick={buatPesanan}
-              disabled={loading || !material}
+              disabled={
+                loading || !material
+              }
               className="rounded-lg bg-circlo-green px-6 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading
                 ? "Memproses Pesanan..."
-                : "Buat Pesanan"}
+                : "Bayar dengan Midtrans"}
             </button>
           )}
         </div>
@@ -485,6 +810,7 @@ export default function CheckoutFlow() {
             <p className="text-circlo-muted">
               Material
             </p>
+
             <p className="font-semibold">
               {material?.nama_material || "-"}
             </p>
@@ -507,20 +833,21 @@ export default function CheckoutFlow() {
 
           <div className="flex justify-between gap-3">
             <span>Pengiriman</span>
-            <span>{data.metodeKirim}</span>
+            <span>
+              {data.metodeKirim}
+            </span>
           </div>
 
           <div className="flex justify-between gap-3">
             <span>Pembayaran</span>
             <span>
-              {data.metodePembayaran === "Virtual Account"
-                ? `VA ${data.bank || "BRI"}`
-                : "QRIS"}
+              Midtrans Sandbox
             </span>
           </div>
 
           <div className="flex justify-between border-t pt-4 text-base font-bold">
             <span>Subtotal</span>
+
             <span className="text-circlo-green">
               {rupiah(subtotal)}
             </span>

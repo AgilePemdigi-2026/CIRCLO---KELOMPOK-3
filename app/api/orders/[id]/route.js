@@ -160,6 +160,58 @@ export async function PATCH(request, { params }) {
       );
     }
 
+
+    // VALIDASI PEMBAYARAN MIDTRANS
+    // Pesanan yang masih menunggu pembayaran
+    // tidak boleh diproses Seller.
+    if (order.status_pesanan === "Menunggu Pembayaran") {
+      return NextResponse.json(
+        {
+          error: "Pesanan masih menunggu pembayaran Buyer.",
+        },
+        { status: 409 }
+      );
+    }
+
+    const { data: pembayaran, error: pembayaranError } =
+      await admin
+        .from("pembayaran_midtrans")
+        .select("status_pembayaran")
+        .eq("id_pesanan", idPesanan)
+        .maybeSingle();
+
+    if (pembayaranError) {
+      throw new Error(
+        "Gagal memeriksa status pembayaran pesanan."
+      );
+    }
+
+    if (pembayaran) {
+      const statusBayar = String(
+        pembayaran.status_pembayaran || ""
+      ).toLowerCase();
+
+      if (!["settlement", "capture"].includes(statusBayar)) {
+        return NextResponse.json(
+          {
+            error: "Pembayaran belum berhasil diverifikasi oleh Midtrans.",
+          },
+          { status: 409 }
+        );
+      }
+
+      // Penolakan setelah pembayaran berhasil
+      // memerlukan mekanisme refund terlebih dahulu.
+      if (action === "reject") {
+        return NextResponse.json(
+          {
+            error: "Pesanan sudah dibayar. Proses refund harus ditangani sebelum pesanan dapat ditolak.",
+          },
+          { status: 409 }
+        );
+      }
+    }
+
     const transition = transitionFor(action, statusKey(order.status_pesanan), order);
     if (transition.error) {
       return NextResponse.json({ error: transition.error }, { status: 409 });

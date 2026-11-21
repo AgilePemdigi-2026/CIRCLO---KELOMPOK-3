@@ -20,14 +20,17 @@ export async function POST(request) {
       return reply({ error: "Sandbox only" }, 403);
     }
 
-    const serverKey = process.env.MIDTRANS_SERVER_KEY;
+
+const serverKey = process.env.MIDTRANS_SERVER_KEY;
+const signatureSecretKey = process.env.MIDTRANS_SIGNATURE_SECRET_KEY;
     const supabaseUrl =
       process.env.SUPABASE_URL ||
       process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceKey =
       process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    if (!serverKey || !supabaseUrl || !serviceKey) {
+
+if (!serverKey || !signatureSecretKey || !supabaseUrl || !serviceKey) {
       return reply({ error: "Konfigurasi belum lengkap" }, 503);
     }
 
@@ -55,8 +58,9 @@ export async function POST(request) {
     }
 
     // 2. Verifikasi signature resmi Midtrans
-    const signatureInput =
-      order_id + status_code + gross_amount + serverKey;
+const signatureInput =
+  order_id + status_code + gross_amount + signatureSecretKey;
+
 
     const expected = createHash("sha512")
       .update(signatureInput)
@@ -219,42 +223,94 @@ export async function POST(request) {
       }
     }
 
-    // Pertahankan status sukses jika Midtrans
-    // sementara mengembalikan status pending.
-    const statusLama = String(
-      pembayaran.status_pembayaran || ""
+    
+    // 8. Sinkronisasi status pembayaran dan pesanan
+    // dalam satu transaksi database Supabase.
+    const { data: hasilSinkronisasi, error: syncError } =
+      await admin.rpc("sync_midtrans_payment", {
+        p_order_id: idPesanan,
+        p_midtrans_order_id: order_id,
+        p_status: statusPembayaran,
+        p_nominal: nominalMidtrans,
+        p_transaction_id: result.transaction_id || null,
+        p_payment_type: result.payment_type || null,
+      });
+
+    if (syncError || !hasilSinkronisasi?.success) {
+      console.error(
+        "Gagal sinkronisasi Midtrans:",
+        syncError?.message || hasilSinkronisasi?.error
+      );
+
+      return reply(
+        {
+          error: "Gagal menyinkronkan pembayaran dan pesanan.",
+        },
+        503
+      );
+    }
+
+    // 9. Berikan respons keberhasilan ke Midtrans
+    
+    // 9. Kembalikan stok jika pembayaran gagal final
+    const statusAkhir = String(
+      hasilSinkronisasi.status_pembayaran || ""
     ).toLowerCase();
 
-    if (
-      ["settlement", "capture"].includes(statusLama) &&
-      statusPembayaran === "pending"
-    ) {
-      return reply({
-        success: true,
-        status_pembayaran: statusLama,
-      });
+    let stockReleased = false;
+    let stockRequiresReview = false;
+
+    const statusGagal = [
+      "expire",
+      "cancel",
+      "deny",
+      "failure",
+    ];
+
+    if (statusGagal.includes(statusAkhir)) {
+      const { data: hasilStok, error: stokError } =
+        await admin.rpc("release_failed_midtrans_order", {
+          p_order_id: idPesanan,
+        });
+
+      if (stokError || !hasilStok?.success) {
+        console.error(
+          "Gagal mengembalikan stok:",
+          stokError?.message || hasilStok?.error
+        );
+
+        // Midtrans dapat mengirim ulang notifikasi
+        // agar proses yang gagal bisa dicoba lagi.
+        return reply(
+          {
+            error: "Gagal memproses pengembalian stok.",
+          },
+          503
+        );
+      }
+
+      stockReleased = hasilStok.stock_released === true;
+      stockRequiresReview =
+        hasilStok.requires_review === true;
+
+      if (stockRequiresReview) {
+        console.warn(
+          "Pesanan perlu pemeriksaan manual:",
+          idPesanan
+        );
+      }
     }
 
-    // 8. Simpan hasil yang terverifikasi
-    const { error: updateError } = await admin
-      .from("pembayaran_midtrans")
-      .update({
-        status_pembayaran: statusPembayaran,
-        transaction_id: result.transaction_id || null,
-        metode_pembayaran: result.payment_type || null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id_pembayaran", pembayaran.id_pembayaran);
-
-    if (updateError) {
-      return reply({
-        error: "Gagal menyimpan status pembayaran",
-      }, 503);
-    }
-
+    // 10. Berikan respons ke Midtrans
     return reply({
       success: true,
-      status_pembayaran: statusPembayaran,
+      id_pesanan: idPesanan,
+      status_pembayaran: statusAkhir,
+      order_updated: hasilSinkronisasi.order_updated,
+      stock_released: stockReleased,
+      requires_review:
+        hasilSinkronisasi.requires_review ||
+        stockRequiresReview,
     });
 
   } catch (error) {

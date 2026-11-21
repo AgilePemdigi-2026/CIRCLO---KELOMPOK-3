@@ -169,16 +169,14 @@ export async function POST(request) {
       pesanan.status_pesanan || ""
     ).trim().toLowerCase();
 
-    if (
-      !["menunggu", "menunggu konfirmasi"].includes(
-        statusPesanan
-      )
-    ) {
-      return sendError(
-        "Status pesanan tidak memungkinkan pembayaran baru.",
-        409
-      );
-    }
+    
+if (statusPesanan !== "menunggu pembayaran") {
+  return sendError(
+    "Hanya pesanan yang berstatus Menunggu Pembayaran yang dapat dibayar melalui Midtrans.",
+    409
+  );
+}
+
 
     // 6. Nominal diambil dari DATABASE,
     // bukan dari harga yang dikirim browser
@@ -269,11 +267,22 @@ export async function POST(request) {
     }
 
     // 9. Membuat transaksi Midtrans Snap
+
+    // Batas waktu pembayaran: 30 menit
+    // Menggunakan zona waktu WIB (UTC+7).
+    const mulaiWib = new Date(
+      Date.now() + 7 * 60 * 60 * 1000
+    )
+      .toISOString()
+      .slice(0, 19)
+      .replace("T", " ") + " +0700";
+
     const payload = {
       transaction_details: {
         order_id: midtransOrderId,
         gross_amount: nominal,
       },
+
       item_details: [
         {
           id: `ORDER-${idPesanan}`,
@@ -282,7 +291,21 @@ export async function POST(request) {
           quantity: 1,
         },
       ],
+
+      // Masa berlaku pembayaran
+      expiry: {
+        start_time: mulaiWib,
+        unit: "minutes",
+        duration: 30,
+      },
+
+      // Masa berlaku halaman Snap
+      page_expiry: {
+        unit: "minutes",
+        duration: 30,
+      },
     };
+
 
     const encodedKey = Buffer.from(
       `${serverKey}:`
@@ -315,25 +338,27 @@ export async function POST(request) {
       .json()
       .catch(() => ({}));
 
+
+    // 10 Tangani kegagalan pembuatan Snap Token
+    // Jangan langsung menghapus referensi pembayaran.
+    // Status transaksi harus dipastikan terlebih dahulu.
     if (!response.ok || !result.token) {
-      // Permintaan ditolak Midtrans.
-      // Hapus reservasi jika belum ada token.
-      await admin
-        .from("pembayaran_midtrans")
-        .delete()
-        .eq(
-          "id_pembayaran",
-          pembayaran.id_pembayaran
-        )
-        .is("snap_token", null);
+      console.error("Midtrans Snap gagal:", {
+        id_pesanan: idPesanan,
+        midtrans_order_id: midtransOrderId,
+        http_status: response.status,
+        midtrans_status_code: result.status_code,
+        midtrans_message: result.error_messages,
+      });
 
       return sendError(
-        "Midtrans gagal membuat pembayaran. Periksa konfigurasi Sandbox.",
+        "Pembayaran belum dapat dibuka. Status transaksi perlu diperiksa sebelum mencoba kembali.",
         502
       );
     }
 
-    // 10. Simpan Snap Token ke database
+
+    // 11. Simpan Snap Token ke database
     const { error: updateError } = await admin
       .from("pembayaran_midtrans")
       .update({
@@ -349,7 +374,7 @@ export async function POST(request) {
       );
     }
 
-    // 11. Mengirim token ke frontend
+    // 12. Mengirim token ke frontend
     return NextResponse.json({
       success: true,
       reused: false,

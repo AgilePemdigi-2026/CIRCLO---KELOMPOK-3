@@ -257,58 +257,125 @@ export async function POST(request) {
       statusPembayaran = "challenge";
     }
 
-    const statusLama = String(
-      pembayaran.status_pembayaran || ""
-    ).toLowerCase();
+    
+    // 10. Pastikan status Midtrans dikenal
+    const validStatuses = [
+      "pending",
+      "settlement",
+      "capture",
+      "deny",
+      "cancel",
+      "expire",
+      "failure",
+      "refund",
+      "partial_refund",
+      "authorize",
+      "challenge",
+    ];
 
-    // Jangan menurunkan status sukses menjadi pending.
-    if (
-      ["settlement", "capture"].includes(statusLama) &&
-      ["pending", "challenge"].includes(statusPembayaran)
-    ) {
-      return NextResponse.json({
-        success: true,
-        id_pesanan: idPesanan,
-        status_pembayaran: statusLama,
-        message: "Status pembayaran berhasil sebelumnya tetap dipertahankan.",
-      });
-    }
-
-    // 10. Simpan hasil verifikasi ke Supabase
-    const { error: updateError } = await admin
-      .from("pembayaran_midtrans")
-      .update({
-        status_pembayaran: statusPembayaran,
-        transaction_id: result.transaction_id || null,
-        metode_pembayaran: result.payment_type || null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id_pembayaran", pembayaran.id_pembayaran)
-      .eq("midtrans_order_id", orderId);
-
-    if (updateError) {
+    if (!validStatuses.includes(statusPembayaran)) {
       return errorResponse(
-        "Status berhasil diperiksa tetapi gagal disimpan.",
-        500
+        "Status pembayaran Midtrans tidak dikenal.",
+        502
       );
     }
 
+    // Pembayaran berhasil harus memiliki status_code 200
+    if (
+      ["settlement", "capture"].includes(statusPembayaran) &&
+      String(result.status_code) !== "200"
+    ) {
+      return errorResponse(
+        "Status keberhasilan Midtrans tidak valid.",
+        502
+      );
+    }
+
+    // 11. Sinkronkan pembayaran dan pesanan
+    // melalui fungsi database yang sama dengan webhook
+    const { data: hasilSinkronisasi, error: syncError } =
+      await admin.rpc("sync_midtrans_payment", {
+        p_order_id: idPesanan,
+        p_midtrans_order_id: orderId,
+        p_status: statusPembayaran,
+        p_nominal: nominalMidtrans,
+        p_transaction_id: result.transaction_id || null,
+        p_payment_type: result.payment_type || null,
+      });
+
+    if (syncError || !hasilSinkronisasi?.success) {
+      console.error(
+        "Midtrans verify sync error:",
+        syncError?.message || hasilSinkronisasi?.error
+      );
+
+      return errorResponse(
+        "Pembayaran berhasil diperiksa tetapi gagal disinkronkan.",
+        503
+      );
+    }
+
+    // 12. Mengambil status akhir dari database
+    const statusAkhir = String(
+      hasilSinkronisasi.status_pembayaran || ""
+    ).toLowerCase();
+
     const lunas = ["settlement", "capture"].includes(
-      statusPembayaran
+      statusAkhir
     );
 
-    // 11. Kirim hasil aman ke frontend
+    // 13. Kembalikan stok jika pembayaran gagal final
+    let stockReleased = false;
+    let stockRequiresReview = false;
+
+    const statusGagal = [
+      "expire",
+      "cancel",
+      "deny",
+      "failure",
+    ];
+
+    if (statusGagal.includes(statusAkhir)) {
+      const { data: hasilStok, error: stokError } =
+        await admin.rpc("release_failed_midtrans_order", {
+          p_order_id: idPesanan,
+        });
+
+      if (stokError || !hasilStok?.success) {
+        console.error(
+          "Midtrans verify stock error:",
+          stokError?.message || hasilStok?.error
+        );
+
+        return errorResponse(
+          "Status pembayaran berhasil diperiksa, tetapi stok belum berhasil disinkronkan.",
+          503
+        );
+      }
+
+      stockReleased = hasilStok.stock_released === true;
+      stockRequiresReview =
+        hasilStok.requires_review === true;
+    }
+
+    // 13. Kirim hasil verifikasi ke frontend
     return NextResponse.json({
       success: true,
       id_pesanan: idPesanan,
+      stock_released: stockReleased,
+      requires_review:
+      hasilSinkronisasi.requires_review || stockRequiresReview,
       midtrans_order_id: orderId,
       nominal: nominalMidtrans,
-      status_pembayaran: statusPembayaran,
+      status_pembayaran: statusAkhir,
       lunas,
+      order_updated: hasilSinkronisasi.order_updated,
+      requires_review: hasilSinkronisasi.requires_review,
       message: lunas
         ? "Pembayaran berhasil diverifikasi oleh Midtrans."
         : "Pembayaran belum dinyatakan lunas.",
     });
+
   } catch (error) {
     console.error(
       "Midtrans verify error:",
