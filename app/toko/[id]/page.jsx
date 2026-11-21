@@ -23,27 +23,6 @@ const rupiah = (value) =>
     maximumFractionDigits: 0,
   }).format(Number(value) || 0);
 
-const KATEGORI_GAMBAR = [
-  "kaca",
-  "karet",
-  "kayu",
-  "kertas",
-  "kulit",
-  "logam",
-  "organik",
-  "plastik",
-  "spanduk",
-  "tekstil",
-];
-
-function gambarKategori(kategori) {
-  const slug = String(kategori || "").toLowerCase();
-
-  return `/images/materials/${
-    KATEGORI_GAMBAR.includes(slug) ? slug : "lainnya"
-  }.svg`;
-}
-
 function adminClient() {
   const url =
     process.env.SUPABASE_URL ||
@@ -103,7 +82,7 @@ const kembaliKe = Number.isSafeInteger(materialAsal) && materialAsal > 0
   const { data: materials, error: materialError } = await admin
     .from("material")
     .select(
-      "id_material, id_seller, nama_material, kategori, harga, stok, satuan, lokasi, kota, status_material"
+      "id_material, id_seller, nama_material, kategori, harga, stok, satuan, lokasi, kota, status_material, foto_url"
     )
     .eq("id_seller", idSeller)
     .eq("status_material", true)
@@ -299,7 +278,7 @@ const kembaliKe = Number.isSafeInteger(materialAsal) && materialAsal > 0
                         materialId={item.id_material}
                         materialName={item.nama_material}
                         category={item.kategori}
-                        imageUrl={gambarKategori(item.kategori)}
+                        imageUrl={item.foto_url || undefined}
                         imageAlt={item.nama_material}
                         className="h-full w-full"
                       />

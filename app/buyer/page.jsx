@@ -4,6 +4,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import SapaanNama from '@/components/SapaanNama';
 import bddFixtures from '@/lib/bdd/fixtures.json';
+import materialImages from '@/public/data/material_images.json';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -69,7 +70,11 @@ const gambarKategori = (kategori) => {
   const slug = String(kategori || '').toLowerCase();
   return `/images/materials/${KATEGORI_GAMBAR.includes(slug) ? slug : 'lainnya'}.svg`;
 };
-const foto = (m) => m.foto_url || gambarKategori(m.kategori);
+// Urutan: foto upload seller -> foto per id di material_images.json -> ilustrasi kategori.
+const foto = (m) =>
+  m.foto_url ||
+  materialImages.materials?.[String(m.id_material)]?.image_url ||
+  gambarKategori(m.kategori);
 // Badge skor hanya tampil kalau tabel material punya kolom skor.
 const skor = (m) => m.match_score ?? m.skor ?? m.eco_score ?? null;
 

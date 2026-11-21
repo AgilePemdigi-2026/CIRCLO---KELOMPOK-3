@@ -12,16 +12,6 @@ const BDD_DEMO = process.env.BDD_DEMO === "1";
 const angka = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 2 });
 const rupiah = (n) => `Rp${angka.format(Number(n))}`;
 
-const KATEGORI_GAMBAR = [
-  "kaca", "karet", "kayu", "kertas", "kulit", "logam",
-  "organik", "plastik", "spanduk", "tekstil",
-];
-
-function gambarKategori(kategori) {
-  const slug = String(kategori || "").toLowerCase();
-  return `/images/materials/${KATEGORI_GAMBAR.includes(slug) ? slug : "lainnya"}.svg`;
-}
-
 function adminClient() {
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -152,7 +142,7 @@ export default async function MaterialDetailPage({ params }) {
               materialId={m.id_material}
               materialName={m.nama_material}
               category={m.kategori}
-              imageUrl={m.foto_url || gambarKategori(m.kategori)}
+              imageUrl={m.foto_url || undefined}
               imageAlt={m.nama_material}
               className="h-full min-h-[260px] w-full"
             />

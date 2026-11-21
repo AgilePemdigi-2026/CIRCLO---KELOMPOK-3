@@ -6,6 +6,7 @@ import { CircleAlert, MapPin, Pencil, Plus } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import RoleGate from '@/components/RoleGate';
+import MaterialImage from '@/components/MaterialImage';
 import { isDemoStore, listMyMaterials } from '@/lib/materials';
 
 const rupiah = (n) => `Rp${Number(n || 0).toLocaleString('id-ID')}`;
@@ -63,10 +64,14 @@ function MyMaterials() {
             {state.rows.map((m) => (
               <li key={m.id} className="overflow-hidden rounded-2xl bg-white shadow-card">
                 <div className="relative h-[190px] w-full bg-circlo-field">
-                  {m.foto_url && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={m.foto_url} alt={m.nama} className="h-full w-full object-cover" />
-                  )}
+                  <MaterialImage
+                    materialId={m.id}
+                    materialName={m.nama}
+                    category={m.kategori}
+                    imageUrl={m.foto_url || undefined}
+                    imageAlt={m.nama}
+                    className="h-full w-full"
+                  />
                   <span className="absolute left-4 top-4 rounded-full bg-circlo-olive px-3 py-1 text-[12px] font-semibold text-circlo-green">{m.jenis_material}</span>
                 </div>
                 <div className="p-6">

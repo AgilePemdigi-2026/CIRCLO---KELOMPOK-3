@@ -897,162 +897,162 @@
     "102": {
       "nama_material": "Tutup Botol Kaleng Crown Cap Bekas",
       "kategori": "Logam",
-      "image_url": "/images/materials/logam.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/tutup-botol-crown-cap.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "103": {
       "nama_material": "Sendok dan Garpu Stainless Afkir",
       "kategori": "Logam",
-      "image_url": "/images/materials/logam.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/sendok-garpu-stainless.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "104": {
       "nama_material": "Velg Sepeda Bekas",
       "kategori": "Logam",
-      "image_url": "/images/materials/logam.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/velg-sepeda-bekas.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "105": {
       "nama_material": "Gelas Kaca Bekas Restoran",
       "kategori": "Kaca",
-      "image_url": "/images/materials/kaca.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/gelas-kaca-restoran.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "106": {
       "nama_material": "Botol Kaca Kecap dan Sirup Bekas",
       "kategori": "Kaca",
-      "image_url": "/images/materials/kaca.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/botol-kaca-kecap-sirup.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "107": {
       "nama_material": "Botol Kaca Wine dan Bir Tebal",
       "kategori": "Kaca",
-      "image_url": "/images/materials/kaca.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/botol-kaca-wine-bir.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "108": {
       "nama_material": "Pallet Kayu Ekspor Heat Treated Bekas",
       "kategori": "Kayu",
-      "image_url": "/images/palet-kayu-lebar.jpg",
-      "source": "Aset lokal CIRCLO",
+      "image_url": "/images/materials/pallet-kayu-ekspor.jpg",
+      "source": "Foto produk tim CIRCLO",
       "license": "Aset proyek CIRCLO",
-      "match_type": "keyword"
+      "match_type": "manual"
     },
     "109": {
       "nama_material": "Papan Pallet Bongkaran Bebas Paku",
       "kategori": "Kayu",
-      "image_url": "/images/palet-kayu-lebar.jpg",
-      "source": "Aset lokal CIRCLO",
+      "image_url": "/images/materials/papan-pallet-bongkaran.jpg",
+      "source": "Foto produk tim CIRCLO",
       "license": "Aset proyek CIRCLO",
-      "match_type": "keyword"
+      "match_type": "manual"
     },
     "110": {
       "nama_material": "Kayu Limbah Gergaji Slab dan Pinggiran",
       "kategori": "Kayu",
-      "image_url": "/images/materials/kayu.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/kayu-limbah-gergaji.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "111": {
       "nama_material": "Kayu Sengon Bekas Peti Kemas",
       "kategori": "Kayu",
-      "image_url": "/images/materials/kayu.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/kayu-sengon-peti-kemas.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "112": {
       "nama_material": "Roda dan Kastor Bekas Gudang",
       "kategori": "Logam",
-      "image_url": "/images/materials/logam.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/roda-kastor-bekas.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "113": {
       "nama_material": "Karung Goni Bekas Pabrik Gula",
       "kategori": "Tekstil",
-      "image_url": "/images/materials/tekstil.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/karung-goni-bekas.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "114": {
       "nama_material": "Tali Tambang Nilon Bekas",
       "kategori": "Tekstil",
-      "image_url": "/images/materials/tekstil.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/tali-tambang-nilon.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "115": {
       "nama_material": "Kulit Buah Kakao Kering",
       "kategori": "Organik",
-      "image_url": "/images/materials/organik.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/kulit-buah-kakao.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "116": {
       "nama_material": "Jerami Padi Bal",
       "kategori": "Organik",
-      "image_url": "/images/materials/organik.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/jerami-padi-bal.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "117": {
       "nama_material": "Kulit Singkong Kering",
       "kategori": "Organik",
-      "image_url": "/images/materials/organik.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/kulit-singkong-kering.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "118": {
       "nama_material": "Daun Pisang Kering Klaras",
       "kategori": "Organik",
-      "image_url": "/images/materials/organik.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/daun-pisang-kering-klaras.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "119": {
       "nama_material": "Pelepah Pinang Kering",
       "kategori": "Organik",
-      "image_url": "/images/materials/organik.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/pelepah-pinang-kering.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "120": {
       "nama_material": "Serutan Kayu Bersih",
       "kategori": "Kayu",
-      "image_url": "/images/materials/kayu.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/serutan-kayu.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "121": {
       "nama_material": "Ampas Kopi Robusta Kering",
       "kategori": "Organik",
-      "image_url": "/images/materials/organik.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/ampas-kopi-robusta.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     }
   }
 }

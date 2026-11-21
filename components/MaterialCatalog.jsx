@@ -14,16 +14,6 @@ const rupiah = new Intl.NumberFormat("id-ID", {
 });
 const angka = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 2 });
 
-const KATEGORI_GAMBAR = [
-  "kaca", "karet", "kayu", "kertas", "kulit", "logam",
-  "organik", "plastik", "spanduk", "tekstil",
-];
-
-function gambarKategori(kategori) {
-  const slug = String(kategori || "").toLowerCase();
-  return `/images/materials/${KATEGORI_GAMBAR.includes(slug) ? slug : "lainnya"}.svg`;
-}
-
 export default function MaterialCatalog() {
   const router = useRouter();
   const { role } = useRole();
@@ -266,7 +256,7 @@ export default function MaterialCatalog() {
                         materialId={m.id_material}
                         materialName={m.nama_material}
                         category={m.kategori}
-                        imageUrl={m.foto_url || gambarKategori(m.kategori)}
+                        imageUrl={m.foto_url || undefined}
                         imageAlt={m.nama_material}
                         className="h-40 w-full"
                       />
