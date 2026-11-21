@@ -3,10 +3,19 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { RefreshCw, PackageSearch } from "lucide-react";
+import {
+  CheckCircle2,
+  PackageSearch,
+  RefreshCw,
+} from "lucide-react";
 
 import Navbar from "@/components/Navbar";
 import { getAccessToken, useRole } from "@/lib/auth";
+import SellerOrderCard from "@/components/seller/SellerOrderCard";
+import {
+  statusKey,
+  statusStyle,
+} from "@/components/seller/orderStatus";
 
 const rupiah = new Intl.NumberFormat("id-ID", {
   style: "currency",
@@ -18,25 +27,24 @@ const angka = new Intl.NumberFormat("id-ID", {
   maximumFractionDigits: 2,
 });
 
-// DAFTAR FILTER STATUS PESANAN
 const FILTER_STATUS = [
-  "Semua",
-  "Menunggu",
-  "Dikonfirmasi",
-  "Disalurkan",
-  "Selesai",
-  "Dibatalkan",
-  "Ditolak",
+  { key: "all", label: "Semua" },
+  { key: "unpaid", label: "Menunggu Pembayaran" },
+  { key: "pending", label: "Menunggu Konfirmasi" },
+  { key: "confirmed", label: "Dikonfirmasi" },
+  { key: "distributed", label: "Disalurkan" },
+  { key: "completed", label: "Selesai" },
+  { key: "cancelled", label: "Dibatalkan" },
+  { key: "rejected", label: "Ditolak" },
 ];
 
-// FORMAT TANGGAL
 function formatDate(value) {
   if (!value) return "-";
 
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
-    return value;
+    return String(value);
   }
 
   return new Intl.DateTimeFormat("id-ID", {
@@ -45,73 +53,11 @@ function formatDate(value) {
   }).format(date);
 }
 
-// MENGELOMPOKKAN STATUS DARI DATABASE
-function kategoriStatus(status) {
-  const value = String(status || "")
-    .trim()
-    .toLowerCase();
-
-  if (value.includes("batal")) {
-    return "Dibatalkan";
-  }
-
-  if (value.includes("tolak")) {
-    return "Ditolak";
-  }
-
-  if (
-    value.includes("selesai") ||
-    value.includes("diterima")
-  ) {
-    return "Selesai";
-  }
-
-  if (
-    value.includes("salur") ||
-    value.includes("dikirim") ||
-    value.includes("siap")
-  ) {
-    return "Disalurkan";
-  }
-
-  if (
-    value.includes("dikonfirmasi") ||
-    value.includes("diproses") ||
-    value.includes("dalam proses")
-  ) {
-    return "Dikonfirmasi";
-  }
-
-  return "Menunggu";
-}
-
-// WARNA BADGE STATUS PESANAN
-function statusStyle(status) {
-  const kategori = kategoriStatus(status);
-
-  switch (kategori) {
-    case "Dibatalkan":
-      return "bg-red-50 text-red-700 border-red-200";
-
-    case "Ditolak":
-      return "bg-orange-50 text-orange-700 border-orange-200";
-
-    case "Selesai":
-      return "bg-green-50 text-green-700 border-green-200";
-
-    case "Disalurkan":
-      return "bg-blue-50 text-blue-700 border-blue-200";
-
-    case "Dikonfirmasi":
-      return "bg-sky-50 text-sky-700 border-sky-200";
-
-    default:
-      return "bg-amber-50 text-amber-700 border-amber-200";
-  }
-}
-
 export default function OrdersPage() {
-  const { role } = useRole();
+  const {
+    role,
+    loading: roleLoading,
+  } = useRole();
 
   const [state, setState] = useState({
     loading: true,
@@ -120,12 +66,19 @@ export default function OrdersPage() {
     role: null,
   });
 
-  const [needsLogin, setNeedsLogin] = useState(false);
+  const [needsLogin, setNeedsLogin] =
+    useState(false);
 
-  // FILTER YANG SEDANG DIPILIH
-  const [filterStatus, setFilterStatus] = useState("Semua");
+  const [filterStatus, setFilterStatus] =
+    useState("all");
 
-  // MENGAMBIL DATA PESANAN
+  const [feedback, setFeedback] =
+    useState(null);
+
+  // ======================================
+  // 1. MENGAMBIL DATA PESANAN
+  // ======================================
+
   const load = useCallback(async () => {
     setState((prev) => ({
       ...prev,
@@ -149,20 +102,28 @@ export default function OrdersPage() {
         return;
       }
 
-      const response = await fetch("/api/orders", {
+      // Seller menggunakan scope khusus Seller.
+      // Buyer menggunakan daftar pesanan miliknya.
+      const endpoint =
+        role === "seller"
+          ? "/api/orders?scope=seller"
+          : "/api/orders";
+
+      const response = await fetch(endpoint, {
+        method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
         },
         cache: "no-store",
       });
 
-      const data = await response
+      const result = await response
         .json()
         .catch(() => ({}));
 
       if (!response.ok) {
         throw new Error(
-          data?.error || "Gagal memuat pesanan."
+          result.error || "Gagal memuat pesanan."
         );
       }
 
@@ -171,10 +132,10 @@ export default function OrdersPage() {
       setState({
         loading: false,
         error: null,
-        orders: Array.isArray(data.orders)
-          ? data.orders
+        orders: Array.isArray(result.orders)
+          ? result.orders
           : [],
-        role: data.role || null,
+        role: result.role || null,
       });
     } catch (err) {
       setState({
@@ -187,33 +148,53 @@ export default function OrdersPage() {
         role: null,
       });
     }
-  }, []);
+  }, [role]);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    if (!roleLoading) {
+      load();
+    }
+  }, [roleLoading, load]);
 
-  // DATA PESANAN YANG SESUAI FILTER
+  // ======================================
+  // 2. REFRESH SETELAH AKSI SELLER
+  // ======================================
+
+  const handleUpdated = (message) => {
+    setFeedback(message);
+    load();
+  };
+
+  // ======================================
+  // 3. FILTER STATUS PESANAN
+  // ======================================
+
   const filteredOrders =
-    filterStatus === "Semua"
+    filterStatus === "all"
       ? state.orders
       : state.orders.filter(
           (order) =>
-            kategoriStatus(order.status_pesanan) ===
+            statusKey(order.status_pesanan) ===
             filterStatus
         );
 
-  // MENGHITUNG JUMLAH PESANAN SETIAP STATUS
-  const jumlahStatus = (status) => {
-    if (status === "Semua") {
+  const jumlahStatus = (key) => {
+    if (key === "all") {
       return state.orders.length;
     }
 
     return state.orders.filter(
       (order) =>
-        kategoriStatus(order.status_pesanan) === status
+        statusKey(order.status_pesanan) === key
     ).length;
   };
+
+  const isSeller =
+    state.role === "seller";
+
+  // ======================================
+  // 4. TAMPILAN HALAMAN
+  // ======================================
 
   return (
     <>
@@ -221,39 +202,65 @@ export default function OrdersPage() {
 
       <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
 
-        {/* HEADER HALAMAN */}
+        {/* HEADER */}
         <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
-              {state.role === "seller"
+              {isSeller
                 ? "Pesanan Masuk"
                 : "Daftar Pesanan"}
             </h1>
 
             <p className="mt-1 text-sm text-gray-500">
-              {state.role === "seller"
-                ? "Pesanan yang berisi material milikmu."
+              {isSeller
+                ? "Kelola pesanan material, konfirmasi, dan proses penyaluran."
                 : "Pantau status pesanan material yang sudah dibuat."}
             </p>
           </div>
 
-          {/* TOMBOL MUAT ULANG */}
           <button
             type="button"
             onClick={load}
-            disabled={state.loading}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={
+              state.loading || roleLoading
+            }
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
           >
             <RefreshCw
               size={16}
               className={
-                state.loading ? "animate-spin" : ""
+                state.loading
+                  ? "animate-spin"
+                  : ""
               }
             />
-
             Muat Ulang
           </button>
         </div>
+
+        {/* NOTIFIKASI AKSI BERHASIL */}
+        {feedback && (
+          <div
+            role="status"
+            className="mb-5 flex items-center justify-between gap-3 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800"
+          >
+            <span className="flex items-center gap-2">
+              <CheckCircle2
+                size={18}
+                className="shrink-0"
+              />
+              {feedback}
+            </span>
+
+            <button
+              type="button"
+              onClick={() => setFeedback(null)}
+              className="font-semibold hover:underline"
+            >
+              Tutup
+            </button>
+          </div>
+        )}
 
         {/* BELUM LOGIN */}
         {needsLogin && (
@@ -263,12 +270,13 @@ export default function OrdersPage() {
             </p>
 
             <p className="mt-1">
-              Pesanan terhubung dengan akun Supabase kamu.
+              Pesanan terhubung dengan akun
+              Supabase kamu.
             </p>
 
             <Link
               href="/login"
-              className="mt-3 inline-block rounded-lg bg-[#3f6a0b] px-4 py-2 text-sm font-semibold text-white hover:bg-[#345609]"
+              className="mt-3 inline-block rounded-lg bg-circlo-green px-4 py-2 font-semibold text-white"
             >
               Masuk
             </Link>
@@ -292,7 +300,7 @@ export default function OrdersPage() {
             <button
               type="button"
               onClick={load}
-              className="mt-3 rounded-lg bg-[#3f6a0b] px-4 py-2 text-sm font-semibold text-white hover:bg-[#345609]"
+              className="mt-3 rounded-lg bg-circlo-green px-4 py-2 font-semibold text-white"
             >
               Coba Lagi
             </button>
@@ -300,19 +308,21 @@ export default function OrdersPage() {
         )}
 
         {/* LOADING */}
-        {state.loading && (
-          <div className="space-y-3">
-            {[0, 1, 2].map((i) => (
-              <div
-                key={i}
-                className="h-28 animate-pulse rounded-xl border border-gray-200 bg-gray-100"
-              />
-            ))}
-          </div>
-        )}
+        {(state.loading || roleLoading) &&
+          !needsLogin && (
+            <div className="space-y-3">
+              {[0, 1, 2].map((i) => (
+                <div
+                  key={i}
+                  className="h-28 animate-pulse rounded-xl border border-gray-200 bg-gray-100"
+                />
+              ))}
+            </div>
+          )}
 
-        {/* BELUM ADA PESANAN */}
+        {/* PESANAN KOSONG */}
         {!state.loading &&
+          !roleLoading &&
           !state.error &&
           !needsLogin &&
           state.orders.length === 0 && (
@@ -327,221 +337,212 @@ export default function OrdersPage() {
               </p>
 
               <p className="mt-1 text-sm text-gray-500">
-                Pesanan yang kamu buat akan ditampilkan
-                di halaman ini.
+                {isSeller
+                  ? "Pesanan material milikmu akan muncul di sini."
+                  : "Pesanan yang kamu buat akan muncul di sini."}
               </p>
             </div>
           )}
 
-        {/* FILTER STATUS PESANAN */}
+        {/* DAFTAR PESANAN */}
         {!state.loading &&
+          !roleLoading &&
           !state.error &&
           !needsLogin &&
           state.orders.length > 0 && (
             <>
+              {/* FILTER */}
               <div className="mb-5 rounded-xl border border-gray-200 bg-white p-2 shadow-sm">
-
                 <div className="flex gap-2 overflow-x-auto pb-1">
-
-                  {FILTER_STATUS.map((status) => {
+                  {FILTER_STATUS.map((filter) => {
                     const active =
-                      filterStatus === status;
+                      filterStatus === filter.key;
 
                     return (
                       <button
-                        key={status}
+                        key={filter.key}
                         type="button"
                         onClick={() =>
-                          setFilterStatus(status)
+                          setFilterStatus(
+                            filter.key
+                          )
                         }
                         aria-pressed={active}
                         className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-semibold transition ${
                           active
-                            ? "bg-[#3f6a0b] text-white shadow-sm"
-                            : "text-gray-500 hover:bg-green-50 hover:text-[#3f6a0b]"
+                            ? "bg-circlo-green text-white"
+                            : "text-gray-500 hover:bg-green-50 hover:text-circlo-green"
                         }`}
                       >
-                        <span>{status}</span>
+                        <span>
+                          {filter.label}
+                        </span>
 
                         <span
-                          className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                          className={`rounded-full px-2 py-0.5 text-xs ${
                             active
                               ? "bg-white/20 text-white"
                               : "bg-gray-100 text-gray-500"
                           }`}
                         >
-                          {jumlahStatus(status)}
+                          {jumlahStatus(
+                            filter.key
+                          )}
                         </span>
                       </button>
                     );
                   })}
-
                 </div>
               </div>
 
-              {/* JUMLAH HASIL FILTER */}
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <p className="text-sm text-gray-500">
-                  Menampilkan{" "}
-                  <span className="font-semibold text-gray-800">
-                    {filteredOrders.length}
-                  </span>{" "}
-                  {filterStatus === "Semua"
-                    ? "pesanan"
-                    : `pesanan ${filterStatus.toLowerCase()}`}
-                </p>
-              </div>
+              {/* JUMLAH HASIL */}
+              <p className="mb-4 text-sm text-gray-500">
+                Menampilkan{" "}
+                <span className="font-semibold text-gray-800">
+                  {filteredOrders.length}
+                </span>{" "}
+                pesanan
+              </p>
 
-              {/* FILTER TIDAK MEMILIKI PESANAN */}
+              {/* HASIL FILTER KOSONG */}
               {filteredOrders.length === 0 && (
-                <div className="rounded-xl border border-dashed border-gray-300 bg-white px-6 py-12 text-center">
-
+                <div className="rounded-xl border border-dashed border-gray-300 bg-white p-10 text-center">
                   <PackageSearch
-                    size={40}
+                    size={36}
                     className="mx-auto mb-3 text-gray-400"
                   />
 
-                  <h3 className="font-semibold text-gray-800">
-                    Tidak ada pesanan
-                  </h3>
-
-                  <p className="mt-2 text-sm text-gray-500">
-                    Belum ada pesanan dengan status{" "}
-                    <span className="font-semibold">
-                      {filterStatus}
-                    </span>
-                    .
+                  <p className="font-semibold text-gray-800">
+                    Tidak ada pesanan pada filter ini.
                   </p>
 
                   <button
                     type="button"
                     onClick={() =>
-                      setFilterStatus("Semua")
+                      setFilterStatus("all")
                     }
-                    className="mt-5 rounded-lg border border-[#3f6a0b] px-5 py-2.5 text-sm font-semibold text-[#3f6a0b] transition hover:bg-green-50"
+                    className="mt-4 rounded-lg border border-circlo-green px-4 py-2 text-sm font-semibold text-circlo-green"
                   >
                     Lihat Semua Pesanan
                   </button>
                 </div>
               )}
 
-              {/* DAFTAR KARTU PESANAN */}
+              {/* KARTU PESANAN */}
               <div className="space-y-4">
+                {filteredOrders.map((order) => {
+                  // SELLER:
+                  // Gunakan komponen tindakan yang
+                  // sudah dipakai Dashboard Seller.
+                  if (isSeller) {
+                    return (
+                      <SellerOrderCard
+                        key={order.id_pesanan}
+                        order={order}
+                        onUpdated={handleUpdated}
+                        showDetail={false}
+                      />
+                    );
+                  }
 
-                {filteredOrders.map((order) => (
-                  <article
-                    key={order.id_pesanan}
-                    className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition hover:shadow-md"
-                  >
+                  // BUYER:
+                  // Pertahankan daftar pesanan
+                  // dengan tombol Detail.
+                  return (
+                    <article
+                      key={order.id_pesanan}
+                      className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"
+                    >
+                      {/* HEADER KARTU */}
+                      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-4">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                            Pesanan #
+                            {order.id_pesanan}
+                          </p>
 
-                    {/* HEADER KARTU */}
-                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-4">
+                          <p className="mt-1 text-xs text-gray-500">
+                            {formatDate(
+                              order.tgl_pesan
+                            )}
+                          </p>
+                        </div>
 
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-                          Pesanan #{order.id_pesanan}
-                        </p>
-
-                        <p className="mt-1 text-xs text-gray-500">
-                          {formatDate(order.tgl_pesan)}
-                        </p>
+                        <span
+                          className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusStyle(
+                            order.status_pesanan
+                          )}`}
+                        >
+                          {order.status_pesanan ||
+                            "Menunggu Konfirmasi"}
+                        </span>
                       </div>
 
-                      <span
-                        className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusStyle(order.status_pesanan)}`}
-                      >
-                        {order.status_pesanan ||
-                          "Menunggu Konfirmasi"}
-                      </span>
+                      {/* MATERIAL */}
+                      <div className="space-y-3 px-5 py-4">
+                        {order.items?.map((item) => (
+                          <div
+                            key={item.id_detail}
+                            className="flex flex-wrap items-center justify-between gap-2 text-sm"
+                          >
+                            <div>
+                              <Link
+                                href={`/katalog/${item.id_material}`}
+                                className="font-semibold text-gray-800 hover:text-circlo-green"
+                              >
+                                {item.nama_material}
+                              </Link>
 
-                    </div>
+                              <p className="text-xs text-gray-500">
+                                {angka.format(
+                                  item.kuantitas_pesan
+                                )}{" "}
+                                {item.satuan} ×{" "}
+                                {rupiah.format(
+                                  item.harga
+                                )}
+                              </p>
+                            </div>
 
-                    {/* MATERIAL PESANAN */}
-                    <div className="space-y-3 px-5 py-4">
-
-                      {order.items?.map((item) => (
-                        <div
-                          key={item.id_detail}
-                          className="flex flex-wrap items-center justify-between gap-2 text-sm"
-                        >
-                          <div>
-                            <Link
-                              href={`/katalog/${item.id_material}`}
-                              className="font-semibold text-gray-800 hover:text-[#3f6a0b]"
-                            >
-                              {item.nama_material}
-                            </Link>
-
-                            <p className="text-xs text-gray-500">
-                              {angka.format(
-                                item.kuantitas_pesan
-                              )}{" "}
-                              {item.satuan} ×{" "}
-                              {rupiah.format(item.harga)}
-                              {item.kota
-                                ? ` · ${item.kota}`
-                                : ""}
-                            </p>
+                            <span className="font-semibold text-gray-800">
+                              {rupiah.format(
+                                item.subtotal
+                              )}
+                            </span>
                           </div>
+                        ))}
+                      </div>
 
-                          <span className="font-semibold text-gray-800">
-                            {rupiah.format(item.subtotal)}
-                          </span>
-                        </div>
-                      ))}
-
-                    </div>
-
-                    {/* FOOTER KARTU */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 bg-gray-50 px-5 py-3 text-sm">
-
-                      <span className="text-gray-500">
-                        {order.metode_kirim ||
-                          "Ambil di tempat"}
-                      </span>
-
-                      <div className="flex items-center gap-3">
-
-                        <span className="font-bold text-gray-900">
-                          Total{" "}
-                          {rupiah.format(
-                            order.total_estimasi
-                          )}
+                      {/* FOOTER BUYER */}
+                      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 bg-gray-50 px-5 py-3 text-sm">
+                        <span className="text-gray-500">
+                          {order.metode_kirim ||
+                            "Ambil di tempat"}
                         </span>
 
-                        {state.role === "buyer" && (
+                        <div className="flex items-center gap-3">
+                          <span className="font-bold text-gray-900">
+                            Total{" "}
+                            {rupiah.format(
+                              order.total_estimasi
+                            )}
+                          </span>
+
                           <Link
                             href={`/orders/${order.id_pesanan}`}
-                            className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-white hover:text-[#3f6a0b]"
+                            className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-white"
                           >
                             Detail
                           </Link>
-                        )}
-
+                        </div>
                       </div>
-                    </div>
-
-                  </article>
-                ))}
-
+                    </article>
+                  );
+                })}
               </div>
             </>
           )}
-
-        {/* INFORMASI ROLE SELLER */}
-        {role === "seller" &&
-          !needsLogin &&
-          state.role === "buyer" &&
-          state.orders.length > 0 && (
-            <p className="mt-4 text-xs text-gray-400">
-              Akun ini terdaftar sebagai pembeli.
-              Pesanan penjual akan tampil jika akun
-              punya data penjual.
-            </p>
-          )}
-
       </main>
     </>
   );
 }
-
