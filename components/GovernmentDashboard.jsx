@@ -1,6 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import WilayahTable from "./government/WilayahTable";
+import MatriksPasokan from "./government/MatriksPasokan";
+import TrenBulanan from "./government/TrenBulanan";
+import KondisiWilayah from "./government/KondisiWilayah";
+import { barisLaporanWilayah } from "./government/ekspor";
+import { persen, rupiahRingkas } from "./government/format";
 
 const HIJAU = "#3a6b0d";
 const HIJAU_MUDA = "#bcd98a";
@@ -113,6 +119,7 @@ export default function GovernmentDashboard() {
     const baris = [
       ["Kategori", "Jumlah Listing", "Material Terserap", "Material Belum Terserap"],
       ...data.kategori.map((r) => [r.kategori, r.listing, r.terserap, r.belum]),
+      ...barisLaporanWilayah(data),   // <-- baris baru
       [],
       ["Neraca Pasokan-Permintaan"],
       ["Kategori", "Satuan", "Pasokan", "Permintaan", "Selisih"],
@@ -283,6 +290,9 @@ export default function GovernmentDashboard() {
             <KartuKpi ikon="♻️" angka={berat.angka} label={berat.unit} tren={data.kpi.trenKg} />
             <KartuKpi ikon="🤝" angka={data.kpi.pesananBerhasil.toLocaleString("id-ID")} label="Kecocokan Berhasil (pesanan)" tren={data.kpi.trenPesanan} />
             <KartuKpi ikon="👥" angka={data.kpi.pengelolaAktif.toLocaleString("id-ID")} label="Pengelola Aktif" tren={data.kpi.trenPengelola} />
+            <KartuKpi ikon="💰" angka={rupiahRingkas(data.kpi.nilaiTransaksi)} label="Nilai Transaksi" tren={data.kpi.trenNilai} />
+            <KartuKpi ikon="📈" angka={persen(data.kpi.rasioSerapan)} label="Rasio Serapan Material" />
+            <KartuKpi ikon="📍" angka={`${data.kpi.wilayahAktif}/${data.kpi.totalWilayah}`} label="Kota/Kabupaten Bertransaksi" />
           </div>
 
           <div className="grid gap-4 lg:grid-cols-3">
@@ -480,7 +490,15 @@ export default function GovernmentDashboard() {
               )}
             </section>
           )}
+                    {/* Analisis per kota/kabupaten */}
+          <WilayahTable wilayah={data.wilayah} />
 
+          <div className="grid gap-4 lg:grid-cols-2">
+            <MatriksPasokan wilayah={data.wilayah} />
+            <TrenBulanan tren={data.trenBulanan} />
+          </div>
+
+          <KondisiWilayah wilayah={data.wilayah} />
           <p className="text-xs text-slate-400">
             Dashboard bersifat read-only. Terakhir diperbarui {new Date(data.diperbarui).toLocaleString("id-ID")}.
           </p>

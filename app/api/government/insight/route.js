@@ -34,11 +34,27 @@ function buatPrompt(s) {
       pasokan_kg: r.pasokanKg,
       permintaan_kg: r.permintaanKg,
     })),
+    nilai_transaksi_rp: Math.round(s.kpi.nilaiTransaksi),
+    rasio_serapan_persen: s.kpi.rasioSerapan,
+    tingkat_pembatalan_persen: s.kpi.tingkatBatal,
+    stok_mengendap_lebih_30_hari: s.kpi.stokMengendap,
+    per_kota_kabupaten: (s.wilayah || []).slice(0, 12).map((w) => ({
+      kota: w.kota,
+      status: w.status,
+      listing: w.listing,
+      pesanan: w.pesanan,
+      nilai_rp: Math.round(w.nilai),
+      serapan_persen: w.rasioSerapan,
+      pembatalan_persen: w.tingkatBatal,
+      mengendap: w.mengendap,
+    })),
   };
   return (
     'Kamu analis kebijakan ekonomi sirkular untuk pemerintah. ' +
-    'Berdasarkan data berikut, tulis wawasan singkat dalam bahasa Indonesia: maksimal 3 kalimat, ' +
-    'sebutkan temuan utama dan satu rekomendasi tindakan. Gunakan hanya angka dari data, jangan mengarang. ' +
+    'Berdasarkan data berikut, tulis wawasan singkat dalam bahasa Indonesia: maksimal 4 kalimat, ' +
+    'sebutkan temuan utama antardaerah (kota/kabupaten) dan satu rekomendasi tindakan yang spesifik untuk daerah tertentu. ' +
+    'Status wilayah: sehat, berkembang, surplus (pasokan menumpuk), butuh-pasokan, belum-aktif. ' +
+    'Gunakan hanya angka dari data, jangan mengarang. ' +
     'Tanpa markdown dan tanpa pembuka.\n\nDATA:\n' +
     JSON.stringify(ringkas)
   );
