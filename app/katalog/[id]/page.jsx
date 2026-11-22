@@ -4,7 +4,6 @@ import { createClient } from "@supabase/supabase-js";
 import Navbar from "@/components/Navbar";
 import MaterialImage from "@/components/MaterialImage";
 import MaterialOrderPanel from "@/components/MaterialOrderPanel";
-import { rankPathwaysForMaterial } from "@/lib/knowledgeGraph";
 import bddFixtures from "@/lib/bdd/fixtures.json";
 
 export const dynamic = "force-dynamic";
@@ -65,7 +64,6 @@ export default async function MaterialDetailPage({ params }) {
   let m;
   let seller = null;
   let rekomendasi = [];
-  let pathways = [];
 
   if (BDD_DEMO) {
     m = bddFixtures.materials.find((item) => Number(item.id_material) === id);
@@ -106,22 +104,6 @@ export default async function MaterialDetailPage({ params }) {
     }
 
     if (!tersedia(m)) rekomendasi = await getRekomendasi(admin, m);
-
-    if (m.kategori) {
-      const { data: resepRows, error: resepError } = await admin
-        .from("resep_produk")
-        .select(
-          "id_resep,nama_produk,kategori_material,kata_kunci_material,bahan_per_unit,satuan,persen_susut,estimasi_modal,langkah_singkat,catatan_k3",
-        )
-        .ilike("kategori_material", m.kategori)
-        .limit(30);
-
-      if (resepError) {
-        console.error("Gagal mengambil jalur pemanfaatan:", resepError.message);
-      } else {
-        pathways = rankPathwaysForMaterial(resepRows || [], m, 4);
-      }
-    }
   }
 
   const ada = tersedia(m);
@@ -272,82 +254,6 @@ export default async function MaterialDetailPage({ params }) {
             </div>
           </section>
         )}
-        {pathways.length > 0 && (
-          <section className="mt-8">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-bold text-gray-800">Potensi Pemanfaatan</h2>
-                <p className="mt-1 text-sm text-gray-500">
-                  Jalur pengolahan dari data resep referensi CIRCLO untuk kategori {m.kategori}.
-                </p>
-              </div>
-              <Link
-                href="/cari-material"
-                className="rounded-lg border border-[#3f6a0b] px-4 py-2 text-xs font-semibold text-[#3f6a0b] hover:bg-green-50"
-              >
-                Tanya CIRCLO AI
-              </Link>
-            </div>
-
-            <ul className="mt-4 grid gap-4 sm:grid-cols-2">
-              {pathways.map((p) => (
-                <li
-                  key={p.id_resep ?? p.produk}
-                  className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm"
-                >
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#3f6212]">
-                    {p.kategori}
-                  </p>
-                  <h3 className="mt-1 text-sm font-bold text-gray-800">{p.produk}</h3>
-
-                  <dl className="mt-3 space-y-1 text-xs text-gray-600">
-                    {p.bahan_per_unit !== null && (
-                      <div className="flex justify-between gap-3">
-                        <dt>Kebutuhan bahan</dt>
-                        <dd className="font-semibold text-gray-800">
-                          {angka.format(p.bahan_per_unit)} {p.satuan || ""}/unit
-                        </dd>
-                      </div>
-                    )}
-                    {p.persen_susut !== null && (
-                      <div className="flex justify-between gap-3">
-                        <dt>Estimasi susut</dt>
-                        <dd className="font-semibold text-gray-800">
-                          {Math.round(p.persen_susut * 100)}%
-                        </dd>
-                      </div>
-                    )}
-                    {p.estimasi_modal !== null && (
-                      <div className="flex justify-between gap-3">
-                        <dt>Estimasi modal</dt>
-                        <dd className="font-semibold text-gray-800">{rupiah(p.estimasi_modal)}</dd>
-                      </div>
-                    )}
-                  </dl>
-
-                  {p.langkah && (
-                    <p className="mt-3 text-xs leading-relaxed text-gray-600">
-                      <span className="font-semibold text-gray-800">Langkah: </span>
-                      {p.langkah}
-                    </p>
-                  )}
-                  {p.k3 && (
-                    <p className="mt-2 text-xs leading-relaxed text-amber-700">
-                      <span className="font-semibold">K3: </span>
-                      {p.k3}
-                    </p>
-                  )}
-                </li>
-              ))}
-            </ul>
-
-            <p className="mt-3 text-xs text-gray-400">
-              Jalur ini berasal dari data resep referensi, bukan jaminan hasil produksi atau klaim
-              dampak lingkungan.
-            </p>
-          </section>
-        )}
-
         {rekomendasi.length > 0 && (
           <section className="mt-8">
             <h2 className="text-lg font-bold text-gray-800">Material lain yang tersedia</h2>

@@ -417,74 +417,74 @@
     "42": {
       "nama_material": "Kertas HVS kantor bekas",
       "kategori": "Kertas",
-      "image_url": "/images/materials/kertas.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/kertas-hvs-bekas.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "43": {
       "nama_material": "Kertas koran bekas",
       "kategori": "Kertas",
-      "image_url": "/images/materials/kertas.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/kertas-koran-bekas.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "44": {
       "nama_material": "Roll inti kertas (tube core)",
       "kategori": "Kertas",
-      "image_url": "/images/materials/kertas.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/roll-inti-kertas.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "45": {
       "nama_material": "Karton duplex sisa potongan pabrik packaging",
       "kategori": "Kertas",
-      "image_url": "/images/materials/kertas.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/karton-duplex-sisa.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "46": {
       "nama_material": "Kemasan karton minuman (Tetra Pak) bersih",
       "kategori": "Kertas",
-      "image_url": "/images/materials/kertas.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/tetra-pak-bersih.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "47": {
       "nama_material": "Botol HDPE sampo dan sabun bekas",
       "kategori": "Plastik",
-      "image_url": "/images/materials/plastik.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/botol-hdpe-sampo.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "48": {
       "nama_material": "Sisa kain batik",
       "kategori": "Tekstil",
-      "image_url": "/images/materials/tekstil.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/kain-batik-sisa.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "49": {
       "nama_material": "Kaleng makanan bekas sudah dibersihkan",
       "kategori": "Logam",
-      "image_url": "/images/materials/logam.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/kaleng-makanan-bekas.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "50": {
       "nama_material": "Karet EVA sisa sandal",
       "kategori": "Karet",
-      "image_url": "/images/materials/karet.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/karet-eva-sandal.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "51": {
       "nama_material": "Kain Katun Hitam",
@@ -761,42 +761,42 @@
     "85": {
       "nama_material": "Kulit Kopi Cascara Kering",
       "kategori": "Organik",
-      "image_url": "/images/materials/organik.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/kulit-kopi-cascara.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "86": {
       "nama_material": "Kulit Jeruk Sisa Perasan",
       "kategori": "Organik",
-      "image_url": "/images/materials/organik.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/kulit-jeruk.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "87": {
       "nama_material": "Kulit Pisang dan Sisa Buah Pasar",
       "kategori": "Organik",
-      "image_url": "/images/materials/organik.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/kulit-pisang.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "88": {
       "nama_material": "Bonggol Jagung Kering",
       "kategori": "Organik",
-      "image_url": "/images/materials/organik.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/bonggol-jagung.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "89": {
       "nama_material": "Ampas Tahu Segar",
       "kategori": "Organik",
-      "image_url": "/images/materials/organik.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/ampas-tahu.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "90": {
       "nama_material": "Kotoran Sapi Perah Kering",
@@ -809,90 +809,90 @@
     "91": {
       "nama_material": "Daun Kering Gugur Serasah",
       "kategori": "Organik",
-      "image_url": "/images/materials/organik.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/daun-kering-serasah.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "92": {
       "nama_material": "Ampas Teh Kering",
       "kategori": "Organik",
-      "image_url": "/images/materials/organik.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/ampas-teh.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "93": {
       "nama_material": "Cangkang Telur Bersih Kering",
       "kategori": "Organik",
-      "image_url": "/images/materials/organik.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/cangkang-telur.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "94": {
       "nama_material": "Serat Pelepah Pisang Kering",
       "kategori": "Organik",
-      "image_url": "/images/materials/organik.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/serat-pelepah-pisang.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "95": {
       "nama_material": "Eceng Gondok Kering",
       "kategori": "Organik",
-      "image_url": "/images/materials/organik.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/eceng-gondok.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "96": {
       "nama_material": "Kertas Kraft Bekas Karung Semen",
       "kategori": "Kertas",
-      "image_url": "/images/materials/kertas.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/kertas-kraft-gulungan.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "97": {
       "nama_material": "Egg Tray Karton Bekas",
       "kategori": "Kertas",
-      "image_url": "/images/materials/kertas.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/egg-tray-karton.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "98": {
       "nama_material": "Majalah dan Katalog Bekas",
       "kategori": "Kertas",
-      "image_url": "/images/materials/kertas.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/majalah-bekas.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "99": {
       "nama_material": "Karton Gelombang Sisa Kemasan Besar",
       "kategori": "Kertas",
-      "image_url": "/images/materials/kertas.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/karton-gelombang.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "100": {
       "nama_material": "Plat Seng Bekas Atap",
       "kategori": "Logam",
-      "image_url": "/images/materials/logam.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/plat-seng-bekas.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "101": {
       "nama_material": "Rangka Besi Hollow Sisa Pagar",
       "kategori": "Logam",
-      "image_url": "/images/materials/logam.svg",
-      "source": "CIRCLO",
-      "license": "Ilustrasi kategori, bukan foto material",
-      "match_type": "category_fallback"
+      "image_url": "/images/materials/rangka-besi-hollow.jpg",
+      "source": "Foto produk tim CIRCLO",
+      "license": "Aset proyek CIRCLO",
+      "match_type": "manual"
     },
     "102": {
       "nama_material": "Tutup Botol Kaleng Crown Cap Bekas",
