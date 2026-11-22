@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300" role="img" aria-label="Ilustrasi kategori Spanduk">
+<rect width="400" height="300" fill="#F5F3FF"/>
+<circle cx="330" cy="52" r="86" fill="#6D28D9" opacity="0.10"/>
+<circle cx="66" cy="252" r="72" fill="#6D28D9" opacity="0.08"/>
+<path d="M110 110h190v110H110z" fill="#6D28D9"/><path d="M110 110l-22 22v88l22 22M300 110l22 22v88l-22 22" fill="#8B5CF6"/><path d="M150 150h110M150 180h84" stroke="#F5F3FF" stroke-width="10" stroke-linecap="round"/>
+<text x="200" y="278" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#6D28D9">Spanduk</text>
+</svg>

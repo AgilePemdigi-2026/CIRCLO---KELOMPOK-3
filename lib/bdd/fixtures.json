@@ -1,0 +1,277 @@
+{
+  "materials": [
+    {
+      "id_material": 1,
+      "id_seller": 1,
+      "nama_material": "Kain Katun Hitam",
+      "kategori": "Tekstil",
+      "deskripsi_material": "Sisa kain katun hitam dari produksi garmen, bersih dan siap digunakan kembali.",
+      "kondisi_seller": "Bersih dan kering",
+      "stok": 250,
+      "satuan": "kg",
+      "harga": 3000,
+      "lokasi": "Surabaya, Jawa Timur",
+      "kota": "Surabaya",
+      "provinsi": "Jawa Timur",
+      "foto_url": "/images/materials/tekstil.svg",
+      "status_material": true,
+      "skor": 82
+    },
+    {
+      "id_material": 2,
+      "id_seller": 1,
+      "nama_material": "Palet Kayu Bekas",
+      "kategori": "Kayu",
+      "deskripsi_material": "Palet kayu bekas ekspedisi yang masih kokoh untuk proyek furnitur.",
+      "kondisi_seller": "Layak pakai",
+      "stok": 80,
+      "satuan": "pcs",
+      "harga": 15000,
+      "lokasi": "Sidoarjo, Jawa Timur",
+      "kota": "Sidoarjo",
+      "provinsi": "Jawa Timur",
+      "foto_url": "/images/materials/kayu.svg",
+      "status_material": true,
+      "skor": 76
+    },
+    {
+      "id_material": 3,
+      "id_seller": 2,
+      "nama_material": "Botol Plastik PET",
+      "kategori": "Plastik",
+      "deskripsi_material": "Botol PET bening hasil pemilahan untuk bahan daur ulang.",
+      "kondisi_seller": "Sudah dicuci",
+      "stok": 120,
+      "satuan": "kg",
+      "harga": 4500,
+      "lokasi": "Malang, Jawa Timur",
+      "kota": "Malang",
+      "provinsi": "Jawa Timur",
+      "foto_url": "/images/materials/plastik.svg",
+      "status_material": true,
+      "skor": 71
+    },
+    {
+      "id_material": 4,
+      "id_seller": 2,
+      "nama_material": "Kaca Jendela Bekas",
+      "kategori": "Kaca",
+      "deskripsi_material": "Kaca jendela bekas dari renovasi bangunan.",
+      "kondisi_seller": "Perlu dibersihkan",
+      "stok": 0,
+      "satuan": "m2",
+      "harga": 20000,
+      "lokasi": "Malang, Jawa Timur",
+      "kota": "Malang",
+      "provinsi": "Jawa Timur",
+      "foto_url": "/images/materials/kaca.svg",
+      "status_material": false,
+      "skor": 64
+    },
+    {
+      "id_material": 5,
+      "id_seller": 2,
+      "nama_material": "Serbuk Kayu Mahoni",
+      "kategori": "Kayu",
+      "deskripsi_material": "",
+      "kondisi_seller": "",
+      "stok": null,
+      "satuan": "kg",
+      "harga": null,
+      "lokasi": "",
+      "kota": "",
+      "provinsi": "",
+      "foto_url": "",
+      "status_material": true,
+      "skor": null
+    }
+  ],
+  "sellers": [
+    {
+      "id_seller": 1,
+      "nama_seller": "Sari Seller",
+      "email_seller": "seller@circlo.test",
+      "status_seller": true
+    },
+    {
+      "id_seller": 2,
+      "nama_seller": "Toko Daur Malang",
+      "email_seller": "toko@circlo.test",
+      "status_seller": true
+    }
+  ],
+  "buyerOrders": [
+    {
+      "id_pesanan": 1,
+      "id_buyer": 1,
+      "total_estimasi": 900000,
+      "metode_kirim": "Dikirim",
+      "status_pesanan": "Dikonfirmasi",
+      "tgl_pesan": "2026-10-12T10:45:00.000Z",
+      "items": [
+        {
+          "id_detail": 1,
+          "id_material": 1,
+          "nama_material": "Kain Katun Hitam",
+          "kategori": "Tekstil",
+          "satuan": "kg",
+          "harga": 3000,
+          "kuantitas_pesan": 2,
+          "subtotal": 6000,
+          "kota": "Surabaya"
+        }
+      ]
+    },
+    {
+      "id_pesanan": 2,
+      "id_buyer": 1,
+      "total_estimasi": 450000,
+      "metode_kirim": "Ambil di tempat",
+      "status_pesanan": "Menunggu Konfirmasi",
+      "tgl_pesan": "2026-10-14T08:30:00.000Z",
+      "items": [
+        {
+          "id_detail": 2,
+          "id_material": 2,
+          "nama_material": "Palet Kayu Bekas",
+          "kategori": "Kayu",
+          "satuan": "pcs",
+          "harga": 15000,
+          "kuantitas_pesan": 4,
+          "subtotal": 60000,
+          "kota": "Sidoarjo"
+        }
+      ]
+    },
+    {
+      "id_pesanan": 3,
+      "id_buyer": 1,
+      "total_estimasi": 1200000,
+      "metode_kirim": "Dikirim",
+      "status_pesanan": "Selesai",
+      "tgl_pesan": "2026-09-28T13:15:00.000Z",
+      "items": [
+        {
+          "id_detail": 3,
+          "id_material": 3,
+          "nama_material": "Botol Plastik PET",
+          "kategori": "Plastik",
+          "satuan": "kg",
+          "harga": 4500,
+          "kuantitas_pesan": 10,
+          "subtotal": 45000,
+          "kota": "Malang"
+        }
+      ]
+    }
+  ],
+  "sellerOrders": [
+    {
+      "id_pesanan": 10,
+      "id_buyer": 1,
+      "total_estimasi": 6000,
+      "metode_kirim": "Dikirim",
+      "status_pesanan": "Menunggu Konfirmasi",
+      "tgl_pesan": "2026-10-15T09:00:00.000Z",
+      "items": [
+        {
+          "id_detail": 10,
+          "id_material": 1,
+          "nama_material": "Kain Katun Hitam",
+          "satuan": "kg",
+          "kuantitas_pesan": 2,
+          "subtotal": 6000,
+          "buyer": { "nama_buyer": "Budi Buyer" }
+        }
+      ]
+    },
+    {
+      "id_pesanan": 11,
+      "id_buyer": 1,
+      "total_estimasi": 15000,
+      "metode_kirim": "Ambil di tempat",
+      "status_pesanan": "Dikonfirmasi",
+      "tgl_pesan": "2026-10-13T11:20:00.000Z",
+      "items": [
+        {
+          "id_detail": 11,
+          "id_material": 2,
+          "nama_material": "Palet Kayu Bekas",
+          "satuan": "pcs",
+          "kuantitas_pesan": 1,
+          "subtotal": 15000,
+          "buyer": { "nama_buyer": "Budi Buyer" }
+        }
+      ]
+    },
+    {
+      "id_pesanan": 12,
+      "id_buyer": 1,
+      "total_estimasi": 9000,
+      "metode_kirim": "Dikirim",
+      "status_pesanan": "Selesai",
+      "tgl_pesan": "2026-09-30T14:10:00.000Z",
+      "items": [
+        {
+          "id_detail": 12,
+          "id_material": 1,
+          "nama_material": "Kain Katun Hitam",
+          "satuan": "kg",
+          "kuantitas_pesan": 3,
+          "subtotal": 9000,
+          "buyer": { "nama_buyer": "Budi Buyer" }
+        }
+      ]
+    }
+  ],
+  "classification": {
+    "name": "Perca Kain Katun",
+    "description": "Perca kain katun bersih sisa produksi garmen, cocok untuk bahan kerajinan dan produk jahit ulang.",
+    "condition": "Bersih dan kering",
+    "category": "Tekstil",
+    "subcategory": "Katun",
+    "composition": "100% katun",
+    "specifications": [
+      { "label": "Lebar", "value": "120 cm" },
+      { "label": "Warna", "value": "Campuran" }
+    ],
+    "potential_uses": ["Tas kain", "Patchwork", "Aksesori"],
+    "buyer_notes": ["Bisa digunakan langsung", "Minimal pembelian 1 kg"],
+    "tags": ["katun", "tekstil", "perca"],
+    "satuan_saran": "kg",
+    "perlu_konfirmasi": [],
+    "confidence": "tinggi"
+  },
+  "government": {
+    "opsi": {
+      "kategori": ["Kayu", "Plastik", "Tekstil"],
+      "kota": ["Malang", "Sidoarjo", "Surabaya"]
+    },
+    "kpi": {
+      "terserapKg": 2400,
+      "terserapUnitLain": 35,
+      "trenKg": { "label": "+12,5%", "arah": "naik" },
+      "pesananBerhasil": 48,
+      "trenPesanan": { "label": "+4,0%", "arah": "naik" },
+      "pengelolaAktif": 12,
+      "trenPengelola": { "label": "Stabil", "arah": "tetap" }
+    },
+    "ringkasan": {
+      "totalListing": 60,
+      "terserap": 24,
+      "belumTerserap": 36
+    },
+    "kategori": [
+      { "kategori": "Tekstil", "listing": 30, "terserap": 12, "belum": 18 },
+      { "kategori": "Plastik", "listing": 20, "terserap": 8, "belum": 12 },
+      { "kategori": "Kayu", "listing": 10, "terserap": 4, "belum": 6 }
+    ],
+    "hotspot": [
+      { "kota": "Surabaya", "provinsi": "Jawa Timur", "listing": 18, "pesanan": 9 },
+      { "kota": "Sidoarjo", "provinsi": "Jawa Timur", "listing": 12, "pesanan": 5 },
+      { "kota": "Malang", "provinsi": "Jawa Timur", "listing": 8, "pesanan": 3 }
+    ],
+    "insightAturan": "Kategori Tekstil mendominasi dengan 30 listing (50% dari total). 24 dari 60 listing sudah terserap. Aktivitas paling padat ada di Surabaya (18 listing, 9 pesanan).",
+    "insightAi": "Wilayah Surabaya mendominasi aktivitas dengan 18 listing dan 9 pesanan. Prioritaskan pendampingan untuk kategori Kayu yang belum terserap. Tingkatkan promosi material Plastik di Malang."
+  }
+}

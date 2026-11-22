@@ -1,0 +1,401 @@
+jenis_material,kategori,kondisi,quantity,harga_per_unit
+Kayu,Lainnya,Sangat Baik,439,6600
+Elektronik,Kemasan,Sangat Baik,239,15300
+Karet,Bahan Baku,Baik,492,2300
+Kertas & Kardus,Bahan Baku,Cukup,380,1100
+Kertas & Kardus,Kemasan,Perlu Perbaikan,325,700
+Organik,Dekoratif,Cukup,451,600
+Kayu,Dekoratif,Cukup,258,3000
+Karet,Bahan Baku,Baik,360,2300
+Plastik,Dekoratif,Cukup,143,2300
+Kayu,Komponen,Baik,481,3900
+Kaca,Struktural,Baik,312,1800
+Lainnya,Komponen,Baik,391,1800
+Elektronik,Bahan Baku,Cukup,230,9600
+Elektronik,Kemasan,Sangat Baik,433,14700
+Elektronik,Struktural,Baik,38,12000
+Elektronik,Bahan Baku,Baik,57,12300
+Kaca,Komponen,Cukup,254,1400
+Logam,Dekoratif,Cukup,366,5300
+Organik,Struktural,Sangat Baik,404,800
+Kertas & Kardus,Kemasan,Baik,220,1300
+Kaca,Struktural,Cukup,325,1200
+Tekstil,Dekoratif,Baik,276,2800
+Logam,Bahan Baku,Baik,480,7600
+Lainnya,Kemasan,Sangat Baik,327,2300
+Elektronik,Kemasan,Cukup,209,6700
+Karet,Komponen,Sangat Baik,484,2800
+Kertas & Kardus,Lainnya,Perlu Perbaikan,54,800
+Organik,Struktural,Baik,492,800
+Kaca,Bahan Baku,Baik,77,2200
+Kertas & Kardus,Struktural,Cukup,144,1100
+Kertas & Kardus,Struktural,Cukup,410,900
+Plastik,Dekoratif,Baik,367,2400
+Kayu,Kemasan,Sangat Baik,485,5800
+Kaca,Lainnya,Baik,375,1900
+Organik,Komponen,Sangat Baik,318,1000
+Kayu,Kemasan,Sangat Baik,173,6900
+Organik,Komponen,Baik,3,800
+Organik,Dekoratif,Sangat Baik,62,900
+Plastik,Lainnya,Perlu Perbaikan,149,1500
+Karet,Lainnya,Cukup,21,1900
+Logam,Struktural,Sangat Baik,254,8800
+Elektronik,Bahan Baku,Sangat Baik,388,12700
+Elektronik,Komponen,Cukup,481,8300
+Tekstil,Bahan Baku,Baik,245,3000
+Kayu,Lainnya,Baik,437,4200
+Lainnya,Lainnya,Sangat Baik,492,2300
+Kertas & Kardus,Bahan Baku,Baik,430,1300
+Organik,Struktural,Baik,233,700
+Karet,Bahan Baku,Baik,163,2600
+Elektronik,Dekoratif,Baik,488,9600
+Elektronik,Bahan Baku,Baik,121,11400
+Logam,Kemasan,Sangat Baik,206,10300
+Tekstil,Bahan Baku,Baik,37,3100
+Kertas & Kardus,Dekoratif,Cukup,397,800
+Kertas & Kardus,Dekoratif,Cukup,325,800
+Kayu,Komponen,Baik,43,5000
+Kaca,Struktural,Sangat Baik,111,2500
+Logam,Dekoratif,Cukup,278,5300
+Elektronik,Lainnya,Perlu Perbaikan,270,6100
+Karet,Struktural,Baik,401,1600
+Lainnya,Bahan Baku,Cukup,133,1600
+Elektronik,Dekoratif,Sangat Baik,462,15600
+Tekstil,Struktural,Cukup,222,2100
+Lainnya,Bahan Baku,Cukup,411,1300
+Kertas & Kardus,Kemasan,Sangat Baik,119,1700
+Tekstil,Dekoratif,Cukup,19,2400
+Lainnya,Struktural,Cukup,28,1500
+Tekstil,Struktural,Cukup,186,3000
+Kayu,Kemasan,Cukup,476,4000
+Kertas & Kardus,Lainnya,Perlu Perbaikan,25,700
+Elektronik,Dekoratif,Perlu Perbaikan,185,7100
+Logam,Dekoratif,Cukup,55,6000
+Kertas & Kardus,Bahan Baku,Perlu Perbaikan,465,800
+Logam,Bahan Baku,Baik,337,7100
+Karet,Dekoratif,Baik,381,2300
+Kertas & Kardus,Struktural,Baik,356,1400
+Tekstil,Kemasan,Cukup,328,3100
+Plastik,Bahan Baku,Baik,387,2900
+Kaca,Bahan Baku,Sangat Baik,5,2300
+Karet,Dekoratif,Sangat Baik,432,3100
+Lainnya,Lainnya,Perlu Perbaikan,370,900
+Kertas & Kardus,Kemasan,Cukup,369,1000
+Logam,Bahan Baku,Cukup,197,6500
+Organik,Dekoratif,Cukup,400,500
+Karet,Komponen,Baik,191,2600
+Elektronik,Lainnya,Baik,25,12000
+Kayu,Struktural,Perlu Perbaikan,454,2300
+Tekstil,Lainnya,Baik,118,3600
+Elektronik,Komponen,Baik,51,9700
+Organik,Struktural,Cukup,311,600
+Kertas & Kardus,Komponen,Sangat Baik,117,1700
+Organik,Struktural,Perlu Perbaikan,429,300
+Organik,Struktural,Sangat Baik,222,900
+Tekstil,Struktural,Perlu Perbaikan,3,1800
+Organik,Bahan Baku,Sangat Baik,475,800
+Plastik,Kemasan,Sangat Baik,257,3700
+Plastik,Bahan Baku,Sangat Baik,132,3200
+Karet,Struktural,Sangat Baik,338,2700
+Karet,Dekoratif,Sangat Baik,265,2600
+Logam,Lainnya,Baik,15,8000
+Organik,Lainnya,Sangat Baik,380,900
+Logam,Komponen,Cukup,201,4900
+Organik,Struktural,Baik,350,800
+Kayu,Komponen,Baik,447,4500
+Elektronik,Komponen,Sangat Baik,305,10900
+Elektronik,Kemasan,Baik,336,8700
+Elektronik,Struktural,Baik,128,12000
+Karet,Lainnya,Baik,119,2400
+Kertas & Kardus,Bahan Baku,Cukup,208,1000
+Elektronik,Struktural,Cukup,426,8100
+Plastik,Dekoratif,Baik,262,2800
+Elektronik,Bahan Baku,Baik,174,13100
+Kaca,Struktural,Cukup,390,1200
+Kertas & Kardus,Dekoratif,Baik,426,1200
+Kaca,Bahan Baku,Baik,451,1600
+Kaca,Lainnya,Cukup,150,1500
+Kayu,Struktural,Baik,355,5100
+Logam,Kemasan,Baik,295,6900
+Plastik,Lainnya,Cukup,225,1500
+Logam,Komponen,Sangat Baik,199,8300
+Kertas & Kardus,Lainnya,Sangat Baik,58,1700
+Karet,Dekoratif,Baik,138,2400
+Karet,Komponen,Cukup,275,1600
+Kertas & Kardus,Lainnya,Baik,443,1400
+Organik,Dekoratif,Sangat Baik,433,900
+Kaca,Bahan Baku,Baik,94,2200
+Kayu,Kemasan,Sangat Baik,339,5200
+Elektronik,Bahan Baku,Baik,43,11000
+Kaca,Dekoratif,Baik,337,1900
+Karet,Lainnya,Cukup,171,1600
+Kaca,Lainnya,Baik,225,1900
+Kaca,Bahan Baku,Cukup,359,1400
+Kayu,Komponen,Baik,213,4400
+Kaca,Bahan Baku,Sangat Baik,403,2600
+Elektronik,Komponen,Cukup,267,7600
+Tekstil,Kemasan,Baik,499,3800
+Karet,Bahan Baku,Perlu Perbaikan,319,1100
+Kayu,Struktural,Baik,148,4400
+Tekstil,Kemasan,Perlu Perbaikan,387,1600
+Kertas & Kardus,Dekoratif,Sangat Baik,204,1500
+Lainnya,Dekoratif,Cukup,267,1200
+Plastik,Dekoratif,Sangat Baik,69,3900
+Plastik,Lainnya,Sangat Baik,60,4000
+Kertas & Kardus,Struktural,Baik,287,1300
+Lainnya,Komponen,Sangat Baik,94,2700
+Organik,Lainnya,Sangat Baik,498,1000
+Kayu,Struktural,Sangat Baik,427,6400
+Plastik,Kemasan,Cukup,350,2100
+Organik,Kemasan,Baik,367,800
+Kayu,Bahan Baku,Perlu Perbaikan,298,1800
+Organik,Komponen,Baik,31,800
+Plastik,Bahan Baku,Cukup,196,2100
+Lainnya,Bahan Baku,Baik,248,1800
+Plastik,Bahan Baku,Baik,457,2500
+Kertas & Kardus,Komponen,Baik,110,1500
+Karet,Kemasan,Baik,248,2700
+Logam,Bahan Baku,Sangat Baik,172,9800
+Kaca,Lainnya,Sangat Baik,68,2600
+Kaca,Komponen,Baik,52,2000
+Elektronik,Lainnya,Baik,183,12100
+Lainnya,Komponen,Sangat Baik,42,2500
+Karet,Bahan Baku,Cukup,34,2000
+Kertas & Kardus,Komponen,Cukup,176,1300
+Kertas & Kardus,Dekoratif,Perlu Perbaikan,101,900
+Kertas & Kardus,Dekoratif,Baik,277,1400
+Organik,Bahan Baku,Baik,9,800
+Tekstil,Lainnya,Sangat Baik,151,3900
+Logam,Kemasan,Baik,227,7100
+Tekstil,Bahan Baku,Cukup,481,2600
+Kayu,Bahan Baku,Sangat Baik,317,6100
+Logam,Dekoratif,Sangat Baik,440,9200
+Kayu,Kemasan,Cukup,172,4100
+Elektronik,Bahan Baku,Baik,225,11300
+Elektronik,Kemasan,Cukup,210,9100
+Karet,Bahan Baku,Cukup,443,1700
+Kertas & Kardus,Dekoratif,Cukup,479,1000
+Elektronik,Lainnya,Sangat Baik,481,14000
+Logam,Bahan Baku,Baik,376,5100
+Lainnya,Struktural,Baik,252,1900
+Kaca,Bahan Baku,Baik,270,1100
+Lainnya,Kemasan,Baik,490,1500
+Logam,Struktural,Sangat Baik,142,10500
+Kertas & Kardus,Dekoratif,Sangat Baik,174,2000
+Karet,Struktural,Baik,448,2000
+Kertas & Kardus,Kemasan,Baik,193,1400
+Kertas & Kardus,Komponen,Sangat Baik,118,2100
+Logam,Lainnya,Baik,280,6900
+Tekstil,Bahan Baku,Sangat Baik,163,5400
+Plastik,Lainnya,Cukup,445,2000
+Tekstil,Dekoratif,Sangat Baik,454,4100
+Karet,Komponen,Baik,153,2900
+Karet,Kemasan,Cukup,265,1700
+Karet,Komponen,Baik,492,2000
+Tekstil,Komponen,Baik,371,3100
+Lainnya,Kemasan,Perlu Perbaikan,108,1000
+Kayu,Dekoratif,Baik,295,3900
+Tekstil,Kemasan,Sangat Baik,310,3800
+Logam,Komponen,Cukup,327,5000
+Tekstil,Lainnya,Baik,13,3800
+Lainnya,Lainnya,Baik,150,2000
+Tekstil,Dekoratif,Cukup,427,2300
+Lainnya,Kemasan,Sangat Baik,121,2500
+Kertas & Kardus,Struktural,Sangat Baik,150,1900
+Karet,Komponen,Cukup,161,2000
+Kertas & Kardus,Lainnya,Sangat Baik,89,1700
+Plastik,Struktural,Sangat Baik,78,3400
+Elektronik,Kemasan,Cukup,174,10000
+Lainnya,Lainnya,Sangat Baik,437,2200
+Plastik,Lainnya,Cukup,1,1900
+Elektronik,Bahan Baku,Sangat Baik,142,15700
+Plastik,Struktural,Baik,31,3100
+Elektronik,Lainnya,Baik,281,9100
+Elektronik,Lainnya,Perlu Perbaikan,126,6100
+Kertas & Kardus,Kemasan,Sangat Baik,396,1800
+Elektronik,Lainnya,Perlu Perbaikan,292,5600
+Plastik,Struktural,Cukup,392,2200
+Kayu,Kemasan,Cukup,317,2900
+Kayu,Struktural,Sangat Baik,219,5800
+Kertas & Kardus,Lainnya,Cukup,430,1000
+Lainnya,Komponen,Sangat Baik,238,2100
+Logam,Lainnya,Baik,475,7800
+Kertas & Kardus,Kemasan,Perlu Perbaikan,497,800
+Elektronik,Struktural,Perlu Perbaikan,294,6400
+Plastik,Struktural,Perlu Perbaikan,337,1500
+Elektronik,Bahan Baku,Baik,128,11900
+Tekstil,Komponen,Sangat Baik,407,4100
+Organik,Struktural,Cukup,336,600
+Kaca,Lainnya,Sangat Baik,451,2300
+Kaca,Dekoratif,Perlu Perbaikan,134,1000
+Logam,Bahan Baku,Sangat Baik,394,9700
+Kertas & Kardus,Dekoratif,Sangat Baik,235,1700
+Organik,Bahan Baku,Sangat Baik,93,900
+Kayu,Bahan Baku,Baik,86,4800
+Elektronik,Struktural,Sangat Baik,281,14400
+Kertas & Kardus,Kemasan,Perlu Perbaikan,160,800
+Elektronik,Komponen,Cukup,51,9300
+Karet,Lainnya,Cukup,214,1800
+Kertas & Kardus,Dekoratif,Baik,326,1300
+Tekstil,Lainnya,Baik,160,3800
+Karet,Lainnya,Baik,477,2300
+Logam,Lainnya,Sangat Baik,389,7900
+Kaca,Bahan Baku,Cukup,256,1500
+Kayu,Lainnya,Baik,467,4300
+Karet,Kemasan,Cukup,217,1400
+Karet,Struktural,Cukup,70,1700
+Kayu,Dekoratif,Baik,18,4500
+Elektronik,Komponen,Sangat Baik,469,13600
+Kertas & Kardus,Struktural,Baik,479,1300
+Elektronik,Bahan Baku,Perlu Perbaikan,369,5200
+Kayu,Komponen,Baik,52,5300
+Logam,Struktural,Perlu Perbaikan,147,4100
+Kertas & Kardus,Bahan Baku,Sangat Baik,21,1900
+Logam,Dekoratif,Baik,26,8300
+Tekstil,Kemasan,Cukup,123,2800
+Karet,Dekoratif,Perlu Perbaikan,286,900
+Logam,Lainnya,Cukup,33,5800
+Karet,Struktural,Sangat Baik,492,2200
+Logam,Lainnya,Baik,228,7200
+Logam,Komponen,Sangat Baik,132,10000
+Kaca,Lainnya,Baik,258,2000
+Elektronik,Lainnya,Baik,395,12100
+Logam,Dekoratif,Cukup,156,6100
+Plastik,Lainnya,Sangat Baik,24,3600
+Lainnya,Kemasan,Cukup,26,1600
+Lainnya,Lainnya,Baik,426,1700
+Kaca,Lainnya,Baik,56,2000
+Kertas & Kardus,Kemasan,Baik,318,1500
+Tekstil,Bahan Baku,Sangat Baik,192,4100
+Karet,Struktural,Cukup,388,1800
+Kaca,Struktural,Baik,31,2100
+Plastik,Bahan Baku,Baik,448,2400
+Kayu,Komponen,Baik,349,4900
+Logam,Kemasan,Cukup,225,5800
+Lainnya,Bahan Baku,Cukup,104,1500
+Kertas & Kardus,Dekoratif,Cukup,488,900
+Kertas & Kardus,Kemasan,Cukup,151,1000
+Kertas & Kardus,Kemasan,Baik,245,1300
+Elektronik,Lainnya,Baik,197,12700
+Kayu,Komponen,Baik,116,4500
+Kayu,Kemasan,Baik,208,4700
+Plastik,Lainnya,Baik,76,2600
+Kertas & Kardus,Bahan Baku,Cukup,1,1100
+Karet,Lainnya,Baik,145,2500
+Kertas & Kardus,Bahan Baku,Cukup,56,1400
+Kertas & Kardus,Struktural,Perlu Perbaikan,207,600
+Lainnya,Bahan Baku,Baik,431,2100
+Logam,Struktural,Baik,82,8100
+Kaca,Struktural,Cukup,1,1600
+Kaca,Lainnya,Baik,56,2000
+Kertas & Kardus,Komponen,Baik,254,1400
+Organik,Dekoratif,Baik,138,800
+Plastik,Lainnya,Baik,245,3100
+Lainnya,Struktural,Baik,15,1900
+Tekstil,Dekoratif,Cukup,167,2900
+Kaca,Komponen,Sangat Baik,205,2100
+Kaca,Dekoratif,Baik,216,1800
+Organik,Komponen,Baik,276,600
+Kertas & Kardus,Lainnya,Baik,390,1400
+Plastik,Struktural,Baik,234,3100
+Kayu,Struktural,Baik,420,4500
+Tekstil,Lainnya,Baik,265,3100
+Organik,Kemasan,Sangat Baik,130,900
+Kayu,Kemasan,Sangat Baik,115,6100
+Organik,Bahan Baku,Baik,161,700
+Kaca,Bahan Baku,Baik,299,1600
+Logam,Komponen,Sangat Baik,121,10200
+Tekstil,Kemasan,Cukup,457,2700
+Kaca,Struktural,Sangat Baik,240,2900
+Tekstil,Kemasan,Baik,431,3000
+Logam,Komponen,Cukup,341,6200
+Karet,Struktural,Perlu Perbaikan,167,1300
+Karet,Bahan Baku,Sangat Baik,114,3100
+Logam,Komponen,Perlu Perbaikan,372,3800
+Plastik,Kemasan,Cukup,166,2300
+Plastik,Struktural,Cukup,124,2300
+Karet,Struktural,Cukup,465,1600
+Elektronik,Kemasan,Cukup,241,7000
+Elektronik,Bahan Baku,Baik,25,10100
+Lainnya,Lainnya,Perlu Perbaikan,247,1000
+Elektronik,Kemasan,Sangat Baik,230,13100
+Tekstil,Lainnya,Sangat Baik,432,3700
+Logam,Dekoratif,Baik,356,7200
+Karet,Bahan Baku,Cukup,96,2000
+Lainnya,Struktural,Baik,76,2000
+Lainnya,Kemasan,Cukup,302,1300
+Plastik,Dekoratif,Baik,24,3400
+Plastik,Bahan Baku,Sangat Baik,160,4300
+Kayu,Bahan Baku,Sangat Baik,69,6600
+Logam,Dekoratif,Sangat Baik,11,11000
+Kaca,Struktural,Cukup,459,1500
+Kaca,Kemasan,Baik,45,2200
+Tekstil,Lainnya,Baik,5,3700
+Tekstil,Dekoratif,Baik,466,3300
+Organik,Bahan Baku,Baik,94,800
+Kertas & Kardus,Dekoratif,Perlu Perbaikan,408,600
+Organik,Komponen,Cukup,16,600
+Lainnya,Bahan Baku,Baik,77,1700
+Tekstil,Lainnya,Cukup,56,2400
+Plastik,Dekoratif,Cukup,353,2300
+Lainnya,Struktural,Sangat Baik,310,2400
+Karet,Kemasan,Sangat Baik,238,3200
+Plastik,Kemasan,Baik,121,2900
+Karet,Lainnya,Sangat Baik,45,2800
+Kaca,Lainnya,Sangat Baik,285,2200
+Lainnya,Lainnya,Cukup,116,1500
+Plastik,Kemasan,Baik,295,2700
+Lainnya,Bahan Baku,Baik,344,2000
+Lainnya,Bahan Baku,Perlu Perbaikan,424,900
+Logam,Struktural,Sangat Baik,247,9300
+Logam,Bahan Baku,Baik,3,7200
+Kaca,Bahan Baku,Baik,141,2100
+Kayu,Struktural,Cukup,426,3400
+Plastik,Dekoratif,Cukup,267,1900
+Kertas & Kardus,Kemasan,Sangat Baik,309,1600
+Lainnya,Bahan Baku,Perlu Perbaikan,229,900
+Lainnya,Lainnya,Cukup,82,1500
+Logam,Bahan Baku,Cukup,448,6400
+Organik,Lainnya,Baik,386,700
+Kayu,Kemasan,Baik,497,4400
+Elektronik,Struktural,Baik,427,8500
+Organik,Dekoratif,Perlu Perbaikan,146,400
+Organik,Komponen,Cukup,127,600
+Plastik,Kemasan,Sangat Baik,124,3500
+Organik,Dekoratif,Baik,459,800
+Logam,Kemasan,Baik,278,7100
+Kaca,Lainnya,Baik,227,2000
+Kertas & Kardus,Bahan Baku,Sangat Baik,484,1700
+Tekstil,Struktural,Perlu Perbaikan,302,1600
+Kayu,Dekoratif,Baik,454,4500
+Elektronik,Lainnya,Baik,492,10800
+Tekstil,Komponen,Cukup,40,3100
+Karet,Lainnya,Sangat Baik,181,2400
+Kertas & Kardus,Lainnya,Baik,367,1100
+Tekstil,Struktural,Sangat Baik,406,3700
+Organik,Dekoratif,Sangat Baik,75,1000
+Kayu,Struktural,Baik,159,5300
+Elektronik,Struktural,Sangat Baik,274,14100
+Elektronik,Lainnya,Baik,399,10400
+Tekstil,Lainnya,Sangat Baik,57,4800
+Plastik,Struktural,Cukup,300,2200
+Kayu,Komponen,Baik,148,5100
+Lainnya,Kemasan,Baik,108,2200
+Lainnya,Struktural,Cukup,258,1400
+Plastik,Lainnya,Baik,207,2500
+Kayu,Lainnya,Sangat Baik,318,6000
+Logam,Kemasan,Baik,159,8100
+Kayu,Komponen,Cukup,411,3400
+Organik,Bahan Baku,Cukup,39,700
+Organik,Komponen,Cukup,431,400
+Logam,Bahan Baku,Perlu Perbaikan,15,3400
+Elektronik,Lainnya,Sangat Baik,368,11900
+Logam,Struktural,Baik,173,7700
+Tekstil,Dekoratif,Cukup,192,2600
+Kaca,Lainnya,Baik,10,1700
+Elektronik,Dekoratif,Perlu Perbaikan,351,4900
+Organik,Dekoratif,Cukup,83,500
+Kayu,Komponen,Baik,329,5600
+Logam,Dekoratif,Baik,362,8500
+Plastik,Kemasan,Sangat Baik,422,3200
+Tekstil,Dekoratif,Baik,354,3000

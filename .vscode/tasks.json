@@ -1,0 +1,28 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Server Python (uvicorn)",
+      "type": "shell",
+      "command": ".\\.venv\\Scripts\\python.exe -m uvicorn circlo_api:app --host 127.0.0.1 --port 8000",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated", "group": "circlo", "reveal": "always" }
+    },
+    {
+      "label": "Next.js (npm run dev)",
+      "type": "shell",
+      "command": "npm run dev",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated", "group": "circlo", "reveal": "always" }
+    },
+    {
+      "label": "Jalankan CIRCLO",
+      "dependsOn": ["Server Python (uvicorn)", "Next.js (npm run dev)"],
+      "dependsOrder": "parallel",
+      "problemMatcher": [],
+      "group": { "kind": "build", "isDefault": true }
+    }
+  ]
+}

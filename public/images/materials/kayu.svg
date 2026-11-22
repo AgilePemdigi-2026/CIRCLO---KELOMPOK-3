@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300" role="img" aria-label="Ilustrasi kategori Kayu">
+<rect width="400" height="300" fill="#FFF4E6"/>
+<circle cx="330" cy="52" r="86" fill="#8B5E34" opacity="0.10"/>
+<circle cx="66" cy="252" r="72" fill="#8B5E34" opacity="0.08"/>
+<rect x="90" y="115" width="220" height="34" rx="7" fill="#8B5E34"/><rect x="110" y="165" width="180" height="30" rx="7" fill="#A9744B"/><path d="M100 215h200" stroke="#8B5E34" stroke-width="10" stroke-linecap="round"/>
+<text x="200" y="278" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#8B5E34">Kayu</text>
+</svg>

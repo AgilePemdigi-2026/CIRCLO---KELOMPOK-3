@@ -1,0 +1,12 @@
+.env
+.env.local
+node_modules/
+.next/
+__pycache__/
+venv/
+ai-service/venv/
+*.dll
+node_modules/
+.next/
+.env*
+!.env.example
