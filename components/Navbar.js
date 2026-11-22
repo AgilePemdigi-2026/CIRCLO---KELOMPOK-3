@@ -39,7 +39,14 @@ export default function Navbar() {
     links: [],
     profileLabel: "Profil",
   };
-
+  // Menu aktif = path persis sama, atau path di bawahnya, KECUALI ada menu lain
+  // yang lebih spesifik (mis. /monitoring tidak aktif saat di /monitoring/material).
+  const isActive = (href) => {
+    if (!pathname) return false;
+    const cocok = (h) => pathname === h || pathname.startsWith(h + "/");
+    if (!cocok(href)) return false;
+    return !nav.links.some((l) => l.href !== href && l.href.startsWith(href + "/") && cocok(l.href));
+  };
   const isBuyer = role === "buyer";
 
   const isCartActive =
@@ -190,7 +197,7 @@ export default function Navbar() {
             {/* MENU DESKTOP */}
             <nav className="hidden h-full items-stretch gap-[35px] lg:flex">
               {nav.links.map((item) => {
-                const active = pathname.startsWith(item.href);
+                const active = isActive(item.href);
 
                 return (
                   <Link
@@ -303,8 +310,7 @@ export default function Navbar() {
           >
             <div className="flex flex-col">
               {nav.links.map((item) => {
-                const active =
-                  pathname.startsWith(item.href);
+              const active = isActive(item.href);
 
                 return (
                   <Link
