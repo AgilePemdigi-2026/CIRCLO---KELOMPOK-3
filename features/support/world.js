@@ -129,6 +129,7 @@ class CircloWorld {
       sellerOrders: clone(fixtures.sellerOrders),
       cart: [],
       lastOrderRequest: null,
+      lastCartCheckoutRequest: null,
       orderPostCount: 0,
     };
   }
@@ -540,6 +541,70 @@ class CircloWorld {
       });
     }
 
+    if (pathname === '/api/orders/cart') {
+      const user = authUserFor(route);
+      if (!user) return this.fulfillJson(route, 401, { error: 'Silakan login terlebih dahulu.' });
+      if (user.user_metadata?.role !== 'buyer') {
+        return this.fulfillJson(route, 403, { error: 'Hanya Buyer yang dapat membuat pesanan.' });
+      }
+      if (method !== 'POST') return this.fulfillJson(route, 405, { error: 'Metode tidak didukung.' });
+
+      const body = jsonBody(route);
+      const items = Array.isArray(body.items) ? body.items : [];
+      if (items.length < 2 || items.length > 20) {
+        return this.fulfillJson(route, 400, { error: 'Pilih 2 sampai 20 material.' });
+      }
+
+      const selected = [];
+      for (const raw of items) {
+        const item = this.state.cart.find(
+          (entry) => Number(entry.id_keranjang) === Number(raw.id_keranjang),
+        );
+        if (!item) {
+          return this.fulfillJson(route, 409, { error: 'Ada material yang tidak ditemukan dalam keranjang.' });
+        }
+        selected.push(item);
+      }
+
+      const total = selected.reduce(
+        (sum, item) => sum + Number(item.harga || 0) * Number(item.kuantitas || 0),
+        0,
+      );
+      const order = {
+        id_pesanan: 98,
+        id_buyer: 1,
+        total_estimasi: total,
+        metode_kirim: body.metode_kirim || 'Dikirim',
+        status_pesanan: 'Menunggu Konfirmasi',
+        tgl_pesan: new Date().toISOString(),
+        items: selected.map((item, index) => ({
+          id_detail: 980 + index,
+          id_material: item.id_material,
+          nama_material: item.nama_material,
+          kategori: item.kategori,
+          satuan: item.satuan,
+          harga: item.harga,
+          kuantitas_pesan: item.kuantitas,
+          subtotal: Number(item.harga || 0) * Number(item.kuantitas || 0),
+          kota: item.kota || 'Surabaya',
+        })),
+      };
+
+      this.state.buyerOrders.unshift(order);
+      this.state.cart = this.state.cart.filter(
+        (item) => !selected.some((picked) => picked.id_keranjang === item.id_keranjang),
+      );
+      this.state.lastCartCheckoutRequest = body;
+
+      return this.fulfillJson(route, 200, {
+        success: true,
+        id_pesanan: order.id_pesanan,
+        total_estimasi: total,
+        jumlah_material: selected.length,
+        status_pesanan: 'Menunggu Konfirmasi',
+      });
+    }
+
     if (pathname.startsWith('/api/orders')) {
       return this.handleOrders(route, url, method);
     }
@@ -649,20 +714,189 @@ class CircloWorld {
     if (pathname === '/api/cart') {
       const user = authUserFor(route);
       if (!user) return this.fulfillJson(route, 401, { error: 'Silakan login sebagai Buyer.' });
+      if (user.user_metadata?.role !== 'buyer') {
+        return this.fulfillJson(route, 403, {
+          error: method === 'GET'
+            ? 'Keranjang hanya tersedia untuk Buyer.'
+            : 'Fitur keranjang hanya untuk Buyer.',
+        });
+      }
 
-      if (method === 'GET') return this.fulfillJson(route, 200, { items: this.state.cart });
+      if (method === 'GET') {
+        return this.fulfillJson(route, 200, { items: clone(this.state.cart) });
+      }
+
       if (method === 'POST') {
         const body = jsonBody(route);
-        this.state.cart.push({
-          id_material: Number(body.id_material),
-          kuantitas: Number(body.jumlah ?? body.kuantitas ?? 1),
-        });
+        const idMaterial = Number(body.id_material);
+        const jumlah = Number(body.jumlah ?? body.kuantitas ?? 1);
+        const material = this.state.materials.find(
+          (item) => Number(item.id_material) === idMaterial,
+        );
+        const stok = Number(material?.stok);
+
+        if (
+          !Number.isSafeInteger(idMaterial) ||
+          idMaterial <= 0 ||
+          !Number.isSafeInteger(jumlah) ||
+          jumlah < 1 ||
+          !material
+        ) {
+          return this.fulfillJson(route, 400, { error: 'Material atau jumlah tidak valid.' });
+        }
+
+        if (material.status_material === false || !Number.isFinite(stok) || stok < 1) {
+          return this.fulfillJson(route, 400, {
+            error: 'Material tidak dapat ditambahkan ke keranjang.',
+          });
+        }
+
+        if (jumlah > stok) {
+          return this.fulfillJson(route, 400, {
+            error: `Jumlah melebihi stok ${stok} ${material.satuan || 'unit'}.`,
+          });
+        }
+
+        const existing = this.state.cart.find(
+          (item) => Number(item.id_material) === idMaterial,
+        );
+
+        if (existing) {
+          existing.kuantitas = Math.min(stok, Number(existing.kuantitas) + jumlah);
+          return this.fulfillJson(route, 200, {
+            success: true,
+            message: 'Material berhasil ditambahkan ke keranjang.',
+            id_keranjang: existing.id_keranjang,
+            jumlah: existing.kuantitas,
+          });
+        }
+
+        const item = {
+          id_keranjang: 700 + this.state.cart.length + 1,
+          id_material: material.id_material,
+          kuantitas: jumlah,
+          nama_material: material.nama_material,
+          kategori: material.kategori,
+          harga: material.harga,
+          stok: material.stok,
+          satuan: material.satuan,
+          lokasi: material.lokasi,
+          status_material: material.status_material,
+        };
+        this.state.cart.push(item);
+
         return this.fulfillJson(route, 200, {
           success: true,
           message: 'Material berhasil ditambahkan ke keranjang.',
+          id_keranjang: item.id_keranjang,
+          jumlah: item.kuantitas,
         });
       }
-      return this.fulfillJson(route, 200, { success: true });
+
+      if (method === 'PATCH') {
+        const body = jsonBody(route);
+        const idKeranjang = Number(body.id_keranjang);
+        const jumlah = Number(body.jumlah);
+        const item = this.state.cart.find(
+          (entry) => Number(entry.id_keranjang) === idKeranjang,
+        );
+
+        if (!item) {
+          return this.fulfillJson(route, 404, {
+            error: 'Material keranjang tidak ditemukan.',
+          });
+        }
+
+        const stok = Number(item.stok);
+        if (!Number.isSafeInteger(jumlah) || jumlah < 1 || jumlah > stok) {
+          return this.fulfillJson(route, 400, {
+            error: `Jumlah harus antara 1 sampai ${stok} ${item.satuan || 'unit'}.`,
+          });
+        }
+
+        item.kuantitas = jumlah;
+        return this.fulfillJson(route, 200, {
+          success: true,
+          message: 'Jumlah material berhasil diperbarui.',
+          id_keranjang: item.id_keranjang,
+          jumlah,
+        });
+      }
+
+      if (method === 'DELETE') {
+        const body = jsonBody(route);
+        const idKeranjang = Number(body.id_keranjang);
+        const index = this.state.cart.findIndex(
+          (entry) => Number(entry.id_keranjang) === idKeranjang,
+        );
+
+        if (index < 0) {
+          return this.fulfillJson(route, 404, {
+            error: 'Material keranjang tidak ditemukan.',
+          });
+        }
+
+        this.state.cart.splice(index, 1);
+        return this.fulfillJson(route, 200, {
+          success: true,
+          message: 'Material berhasil dihapus dari keranjang.',
+          id_keranjang: idKeranjang,
+        });
+      }
+
+      return this.fulfillJson(route, 405, { error: 'Metode tidak didukung.' });
+    }
+
+    if (pathname === '/api/government') {
+      if (!this.role) {
+        return this.fulfillJson(route, 401, {
+          error: 'Silakan login sebagai Pemerintah/Admin untuk melihat halaman ini.',
+        });
+      }
+      if (this.role !== 'government') {
+        return this.fulfillJson(route, 403, { error: 'Halaman ini khusus Pemerintah/Admin.' });
+      }
+
+      const kategori = (url.searchParams.get('kategori') || '').trim();
+      const kota = (url.searchParams.get('kota') || '').trim();
+      const periode = url.searchParams.get('periode') || 'semua';
+      const base = clone(fixtures.government);
+      const kategoriRows = base.kategori.filter(
+        (row) => !kategori || row.kategori === kategori,
+      );
+      const hotspot = base.hotspot.filter((row) => !kota || row.kota === kota);
+      const ringkasan = {
+        totalListing: kategoriRows.reduce((sum, row) => sum + row.listing, 0),
+        terserap: kategoriRows.reduce((sum, row) => sum + row.terserap, 0),
+        belumTerserap: kategoriRows.reduce((sum, row) => sum + row.belum, 0),
+      };
+
+      return this.fulfillJson(route, 200, {
+        filter: { periode, kategori, kota },
+        opsi: base.opsi,
+        kpi: base.kpi,
+        ringkasan,
+        kategori: kategoriRows,
+        hotspot,
+        diperbarui: new Date().toISOString(),
+        insightAturan: base.insightAturan,
+      });
+    }
+
+    if (pathname === '/api/government/insight') {
+      if (!this.role) {
+        return this.fulfillJson(route, 401, {
+          error: 'Silakan login sebagai Pemerintah/Admin untuk melihat halaman ini.',
+        });
+      }
+      if (this.role !== 'government') {
+        return this.fulfillJson(route, 403, { error: 'Halaman ini khusus Pemerintah/Admin.' });
+      }
+
+      return this.fulfillJson(route, 200, {
+        teks: fixtures.government.insightAi,
+        sumber: 'ai',
+      });
     }
 
     return route.continue();

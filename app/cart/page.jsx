@@ -298,7 +298,7 @@ export default function CartPage() {
         <div className="mx-auto w-full max-w-6xl">
           {/* KEMBALI */}
           <Link
-            href="/marketplace"
+            href="marketplace"
             className="mb-6 inline-flex items-center gap-2 text-sm text-gray-500 hover:text-[#3f6a0b]"
           >
             <ArrowLeft size={17} />
@@ -384,7 +384,7 @@ export default function CartPage() {
                 Kamu belum menambahkan material.
               </p>
               <Link
-                href="/marketplace"
+                href="marketplace"
                 className="mt-6 inline-block rounded-xl bg-[#3f6a0b] px-6 py-3 text-sm font-semibold text-white"
               >
                 Cari Material
@@ -438,6 +438,7 @@ export default function CartPage() {
                   return (
                     <article
                       key={item.id_keranjang}
+                      data-testid="cart-item"
                       className={`rounded-2xl border bg-white p-5 shadow-sm ${
                         checked
                           ? "border-[#9dc174]"
@@ -521,7 +522,10 @@ export default function CartPage() {
                                     <Minus size={16} />
                                   </button>
 
-                                  <span className="flex h-9 min-w-12 items-center justify-center border-x border-gray-200 text-sm font-semibold">
+                                  <span
+                                    data-testid="cart-quantity"
+                                    className="flex h-9 min-w-12 items-center justify-center border-x border-gray-200 text-sm font-semibold"
+                                  >
                                     {sedangUpdate ? (
                                       <Loader2
                                         size={16}
@@ -589,7 +593,10 @@ export default function CartPage() {
                           <p className="text-xs text-gray-500">
                             Subtotal Material
                           </p>
-                          <p className="mt-1 text-lg font-bold text-[#3f6a0b]">
+                          <p
+                            data-testid="cart-subtotal"
+                            className="mt-1 text-lg font-bold text-[#3f6a0b]"
+                          >
                             {rupiah(subtotal)}
                           </p>
                         </div>

@@ -241,5 +241,37 @@
     "satuan_saran": "kg",
     "perlu_konfirmasi": [],
     "confidence": "tinggi"
+  },
+  "government": {
+    "opsi": {
+      "kategori": ["Kayu", "Plastik", "Tekstil"],
+      "kota": ["Malang", "Sidoarjo", "Surabaya"]
+    },
+    "kpi": {
+      "terserapKg": 2400,
+      "terserapUnitLain": 35,
+      "trenKg": { "label": "+12,5%", "arah": "naik" },
+      "pesananBerhasil": 48,
+      "trenPesanan": { "label": "+4,0%", "arah": "naik" },
+      "pengelolaAktif": 12,
+      "trenPengelola": { "label": "Stabil", "arah": "tetap" }
+    },
+    "ringkasan": {
+      "totalListing": 60,
+      "terserap": 24,
+      "belumTerserap": 36
+    },
+    "kategori": [
+      { "kategori": "Tekstil", "listing": 30, "terserap": 12, "belum": 18 },
+      { "kategori": "Plastik", "listing": 20, "terserap": 8, "belum": 12 },
+      { "kategori": "Kayu", "listing": 10, "terserap": 4, "belum": 6 }
+    ],
+    "hotspot": [
+      { "kota": "Surabaya", "provinsi": "Jawa Timur", "listing": 18, "pesanan": 9 },
+      { "kota": "Sidoarjo", "provinsi": "Jawa Timur", "listing": 12, "pesanan": 5 },
+      { "kota": "Malang", "provinsi": "Jawa Timur", "listing": 8, "pesanan": 3 }
+    ],
+    "insightAturan": "Kategori Tekstil mendominasi dengan 30 listing (50% dari total). 24 dari 60 listing sudah terserap. Aktivitas paling padat ada di Surabaya (18 listing, 9 pesanan).",
+    "insightAi": "Wilayah Surabaya mendominasi aktivitas dengan 18 listing dan 9 pesanan. Prioritaskan pendampingan untuk kategori Kayu yang belum terserap. Tingkatkan promosi material Plastik di Malang."
   }
 }

@@ -8,6 +8,7 @@ import numpy as np
 
 from circlo_ai.calculator import hitung_kebutuhan, rencana_beli
 from circlo_ai.dialog import DialogManager, State
+from circlo_ai.knowledge_graph import KnowledgeGraph
 from circlo_ai.recommender import Recommender
 from circlo_ai.slots import extract_kota, extract_slots, parse_modal, parse_quantity
 
@@ -74,7 +75,36 @@ class FakeEmbedder:
 
 
 def new_dm():
-    return DialogManager(FakeCatalog(), Recommender(FakeEmbedder(), RESEP)), State()
+    kg = KnowledgeGraph.from_recipes(RESEP)
+    return DialogManager(FakeCatalog(), Recommender(FakeEmbedder(), RESEP), kg=kg), State()
+
+
+RESEP_KG = RESEP + [
+    rs(8, "Tas tote dan pouch dari kain perca", "Tekstil", "kain perca|kain katun",
+       0.5, "kg", 0.1, 2_000_000, "Sortir, cuci, potong pola, jahit.", "Pakai masker."),
+    rs(9, "Boneka dan bantal dari kain perca", "Tekstil", "kain perca|kain katun",
+       0.3, "kg", 0.1, 1_500_000, "Sortir, cuci, potong, jahit, isi.", "Pakai masker."),
+    rs(10, "Keset dan alas duduk dari kain perca", "Tekstil", "kain perca|denim",
+       0.4, "kg", 0.12, 1_800_000, "Sortir, cuci, potong, anyam.", None),
+]
+
+MATERIALS_KG = MATERIALS + [
+    mat(8, "Kain perca katun campur warna", "Tekstil", 80, 12000, "Sidoarjo", "Jawa Timur", "kg"),
+    mat(9, "Kain perca denim bekas", "Tekstil", 50, 15000, "Surabaya", "Jawa Timur", "kg"),
+]
+
+
+class FakeCatalogKG(FakeCatalog):
+    def materials(self):
+        return [dict(m) for m in MATERIALS_KG]
+
+    def resep(self):
+        return [dict(r) for r in RESEP_KG]
+
+
+def new_kg_dm():
+    kg = KnowledgeGraph.from_recipes(RESEP_KG)
+    return DialogManager(FakeCatalogKG(), Recommender(FakeEmbedder(), RESEP_KG), kg=kg), State()
 
 
 # ---------- tes ----------
@@ -235,6 +265,79 @@ def test_fakta_lengkap():
     assert r.task == "cara" and r.facts["k3"] is not None or r.facts["langkah"]
     r = dm.handle(st, "hitung untuk 100 pcs")
     assert r.task == "hitung" and r.facts["kebutuhan"] > 0 and "total_biaya" in r.facts
+
+
+def test_kg_potensi():
+    kg = KnowledgeGraph.from_recipes(RESEP)
+    assert kg.pathways_for_category("Spanduk")
+    assert kg.pathways_for_text("mau olah spanduk bekas")
+    assert kg.pathways_for_material({"kategori": "Kayu", "nama_material": "Pallet kayu bekas"})
+
+    dm, st = new_dm()
+    st.kota = "Surabaya"
+    st.provinsi = "Jawa Timur"
+    r = dm.handle(st, "potensi pemanfaatan spanduk bekas")
+    assert r.intent == "material_utilization" and r.task == "kg_pemanfaatan", (r.intent, r.task)
+    assert r.facts["jenis"] == "pemanfaatan_material" and r.facts["jalur"]
+    assert "resep referensi" in r.text.lower()
+
+
+def test_scenario_1_eksplorasi_ide():
+    dm, st = new_kg_dm()
+    r = dm.handle(st, "Aku ingin membuat produk kerajinan ramah lingkungan.")
+    assert r.intent == "exploration" and r.task == "kg_eksplorasi", (r.intent, r.task)
+    assert not r.material_ids
+    assert r.facts["jenis"] == "eksplorasi_ide"
+    assert "resep referensi" in r.text.lower()
+
+
+def test_scenario_2_pengembangan_produk():
+    dm, st = new_kg_dm()
+    r = dm.handle(st, "Aku ingin membuat pouch dari limbah.")
+    assert r.intent == "product_development" and r.task == "kg_produk", (r.intent, r.task)
+    assert not r.material_ids
+    assert r.facts["jenis"] == "pengembangan_produk"
+    assert "pouch" in r.text.lower()
+
+
+def test_scenario_3_material_untuk_produk():
+    dm, st = new_kg_dm()
+    r = dm.handle(st, "Material apa yang dapat digunakan untuk membuat paving block?")
+    assert r.intent == "product_development" and r.task == "kg_produk", (r.intent, r.task)
+    assert not r.material_ids
+    assert r.facts["jenis"] == "pengembangan_produk"
+    assert "paving" in r.text.lower()
+
+
+def test_scenario_4_alternatif_material():
+    dm, st = new_kg_dm()
+    r = dm.handle(st, "Kalau kain perca tidak tersedia, apa alternatifnya?")
+    assert r.intent == "alternative_discovery" and r.task == "kg_alternatif", (r.intent, r.task)
+    assert not r.material_ids
+    assert r.facts["jenis"] == "alternatif_material"
+    assert r.facts["alternatif"]
+    assert "kain" in r.text.lower()
+
+
+def test_scenario_5_penjelasan_proses():
+    dm, st = new_kg_dm()
+    r = dm.handle(st, "Jelaskan proses pengolahan kain perca menjadi tas.")
+    assert r.intent == "process_explanation" and r.task == "kg_proses", (r.intent, r.task)
+    assert not r.material_ids
+    assert r.facts["jenis"] == "penjelasan_proses"
+    assert st.fokus_kategori == "Tekstil"
+    assert "tas" in r.text.lower()
+
+
+def test_scenario_6_katalog_setelah_konteks_kg():
+    dm, st = new_kg_dm()
+    dm.handle(st, "Jelaskan proses pengolahan kain perca menjadi tas.")
+    r = dm.handle(st, "Sekarang carikan material yang tersedia di Sidoarjo.")
+    assert r.intent == "marketplace_search", r.intent
+    assert r.task == "katalog"
+    assert r.material_ids
+    assert st.kota == "Sidoarjo"
+    assert "Tekstil" in (r.facts.get("filter", {}).get("kategori") or [])
 
 
 if __name__ == "__main__":

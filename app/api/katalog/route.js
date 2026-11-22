@@ -27,12 +27,17 @@ export async function GET(req) {
   const q = clean(searchParams.get('q'));
   const kategori = clean(searchParams.get('kategori'));
   const kota = clean(searchParams.get('kota'));
+  // Number(null) === 0, jadi param yang tidak dikirim harus dicek dulu supaya tidak jadi filter harga <= 0
+  const hargaMaxParam = searchParams.get('harga_max');
+  const hargaMaxRaw = hargaMaxParam ? Number(hargaMaxParam) : NaN;
+  const hargaMax = Number.isFinite(hargaMaxRaw) && hargaMaxRaw > 0 ? hargaMaxRaw : null;
 
   let query = admin.from('material').select('*').order('id_material', { ascending: false }).limit(200);
 
   if (q) query = query.or(`nama_material.ilike.%${q}%,deskripsi_material.ilike.%${q}%`);
   if (kategori) query = query.ilike('kategori', kategori);
   if (kota) query = query.ilike('kota', `%${kota}%`);
+  if (hargaMax !== null) query = query.lte('harga', hargaMax);
 
   const { data, error } = await query;
   if (error) {

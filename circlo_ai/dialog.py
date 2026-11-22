@@ -7,6 +7,7 @@ from collections import Counter
 from dataclasses import asdict, dataclass, field
 
 from . import facts as F
+from . import intent as I
 from . import responder as R
 from .catalog import (
     alternative_search,
@@ -32,6 +33,13 @@ RE_MULAI = re.compile(   # niat spesifik: valid kapan pun
 RE_CARA = re.compile(
     r"\b(cara|proses|mengolah|diolah|pengolahan|olah|tutorial|teknis|tahapan"
     r"|membuatnya|bikinnya|buatnya|(?:gimana|gmn|bagaimana)\s+(?:membuat|bikin|mengolah|buat|olah))\b"
+)
+RE_POTENSI = re.compile(
+    r"\b(potensi|pemanfaatan|dimanfaatkan|memanfaatkan|diolah|olahan|jadi apa"
+    r"|bisa jadi|produk apa|daur ulang jadi|upcycle|gunakan ulang)\b"
+)
+RE_CARA_EKSPLISIT = re.compile(
+    r"\b(cara|tutorial|tahapan|langkah|bagaimana|gimana|gmn)\b"
 )
 RE_DOMAIN = re.compile(   # kalimat 'cara ...' dianggap soal produk/usaha bila ada kata ini
     r"\b(bahan\w*|produk\w*|usaha|bisnis|material|olah\w*|jahit\w*|potong\w*|cuci\w*|daur|sisa"
@@ -131,6 +139,10 @@ class State:
     last_search_meta: dict = field(default_factory=dict)
     last_signature: str = ""
     last_turn: str = ""
+    fokus_kategori: str | None = None
+    fokus_produk: str | None = None
+    fokus_kata_kunci: list = field(default_factory=list)
+    kg_terakhir: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:   # cocok disimpan ke ai_conversation.slots (jsonb)
         return asdict(self)
@@ -154,10 +166,11 @@ class Reply:
 
 
 class DialogManager:
-    def __init__(self, catalog, recommender, llm_fallback=None):
+    def __init__(self, catalog, recommender, llm_fallback=None, kg=None):
         self.catalog = catalog
         self.reco = recommender
         self.llm_fallback = llm_fallback  # hook: Step 5-6 (model LoRA) untuk pertanyaan terbuka
+        self.kg = kg  # KnowledgeGraph dari resep_produk (opsional)
         df = Counter()
         for r in recommender.resep_list:
             df.update(_tokens(r["nama_produk"]))
@@ -274,9 +287,11 @@ class DialogManager:
             return "provinsi"
         return "all"
 
-    def _search_materials(self, state: State, text: str, limit: int | None = None) -> dict:
+    def _search_materials(self, state: State, text: str, limit: int | None = None,
+                          kategori: str | None = None,
+                          query_override: str | None = None) -> dict:
         materials, _ = self._catalog_data()
-        query = _catalog_query(text)
+        query = _catalog_query(text) if query_override is None else query_override
         if limit is None:
             limit, _ = _requested_limit(text)
         budget = parse_modal(text)
@@ -290,6 +305,7 @@ class DialogManager:
             kota=state.kota,
             provinsi=state.provinsi,
             scope=self._scope(state),
+            kategori=kategori,
             max_harga=budget,
             limit=limit,
         )
@@ -307,7 +323,31 @@ class DialogManager:
         state.awaiting = []
 
     def _catalog_reply(self, state: State, text: str) -> Reply:
-        found = self._search_materials(state, text)
+        kategori = next(iter(categories_for_query(text)), None)
+        query = _catalog_query(text)
+        for lokasi in (state.kota, state.provinsi):
+            if lokasi:
+                query = " ".join(
+                    token for token in query.split()
+                    if token.lower() != str(lokasi).lower()
+                )
+        if not kategori and self.kg:
+            products = self.kg.search_products(text, limit=2)
+            if products:
+                kategori = products[0].get("kategori")
+                if not categories_for_query(text):
+                    query = ""
+                state.fokus_kategori = kategori or state.fokus_kategori
+                state.fokus_produk = products[0].get("produk") or state.fokus_produk
+                state.kg_terakhir = {
+                    "jenis": "marketplace_context",
+                    "kategori": state.fokus_kategori,
+                    "produk": state.fokus_produk,
+                    "jalur": products,
+                }
+        if not kategori and not query:
+            kategori = state.fokus_kategori
+        found = self._search_materials(state, text, kategori=kategori, query_override=query)
         cards = [self._material_card(m) for m in found["items"]]
         if found["total"] == 0:
             query = found["query"]
@@ -317,6 +357,7 @@ class DialogManager:
                     all_materials,
                     query=query,
                     scope="all",
+                    kategori=found.get("kategori") or None,
                     max_harga=found.get("max_harga"),
                     limit=min(8, found["limit"] or 8),
                 )
@@ -329,9 +370,10 @@ class DialogManager:
                                  facts=F.katalog(state, elsewhere, alt_cards, alternatif=True))
 
             categories = categories_for_query(text)
+            kategori_alt = kategori or (next(iter(categories)) if len(categories) == 1 else None)
             alts = alternative_search(
                 all_materials,
-                kategori=next(iter(categories)) if len(categories) == 1 else None,
+                kategori=kategori_alt,
                 kota=state.kota if not state.scope_all else None,
                 provinsi=state.provinsi if not state.scope_all else None,
                 limit=min(6, found["limit"] or 6),
@@ -408,6 +450,60 @@ class DialogManager:
                      intent="pesan", task="pesan",
                      facts=F.order_material(card, qty, total))
 
+    def _potensi_reply(self, state: State, text: str) -> Reply:
+        materials, _ = self._catalog_data()
+        categories = categories_for_query(text)
+        m = self._find_material(text, state, materials)
+        if not categories and m:
+            categories = {m.get("kategori")}
+        if not categories and state.selected_material:
+            categories = {state.selected_material.get("kategori")}
+
+        pathways: list[dict] = []
+        seen: set[str] = set()
+        for category in sorted(c for c in categories if c):
+            for pathway in self.kg.pathways_for_category(category, limit=4):
+                product = str(pathway.get("produk") or "")
+                if product in seen:
+                    continue
+                seen.add(product)
+                pathways.append(pathway)
+                if len(pathways) >= 4:
+                    break
+            if len(pathways) >= 4:
+                break
+
+        if not pathways:
+            pathways = self.kg.pathways_for_text(text, limit=4)
+
+        if not pathways:
+            return Reply(
+                R.potensi_kosong_text(text),
+                intent="potensi",
+                task="potensi",
+                facts={"jenis": "potensi_pemanfaatan", "jalur": [],
+                       "catatan": "Belum ada resep yang cocok."},
+            )
+
+        category = pathways[0].get("kategori") or next(iter(categories), None)
+        found = material_search(
+            materials,
+            kategori=category,
+            kota=state.kota,
+            provinsi=state.provinsi,
+            scope=self._scope(state),
+            limit=3,
+        )
+        cards = [self._material_card(x) for x in found["items"]]
+        self._set_material_result(state, cards, "potensi", text)
+        return Reply(
+            R.potensi_text(category, pathways, cards),
+            [c["id_material"] for c in cards],
+            intent="potensi",
+            task="potensi",
+            facts=F.potensi(category, pathways, cards, state),
+        )
+
     def _material_hitung_reply(self, state: State, text: str) -> Reply:
         materials, _ = self._catalog_data()
         m = self._find_material(text, state, materials)
@@ -483,7 +579,10 @@ class DialogManager:
                 and not sl.modal_asumsi):
             return "modal_q"
         if material_list_context and query_tokens(t) and not explicit:
-            if categories_for_query(t) or state.last_result_kind in ("material", "stats"):
+            # Jangan tampilkan katalog lagi hanya karena ada kata kategori. Butuh
+            # permintaan eksplisit (cari/tampilkan/pilihan lain) agar tidak agresif.
+            if RE_KATALOG.search(tl) or re.search(
+                    r"\b(lebih\s+banyak|pilihan\s+lain|lainnya|alternatif|lain)\b", tl):
                 return "katalog"
         return None
 
@@ -494,6 +593,23 @@ class DialogManager:
         materials, _ = self._catalog_data()
         explicit, how = self._resolve_resep(text, state)
         intent = self._classify(text, sl, qty, state, explicit)
+        percakapan = I.classify_intent(text)
+        marketplace_label = None
+
+        # KG-first: pertanyaan ide/pemanfaatan/proses/alternatif tidak perlu katalog.
+        if self.kg and percakapan in I.KG_INTENTS:
+            if intent not in ("hitung", "hitung_material", "pesan", "detail_material",
+                              "pilih_material", "katalog_jumlah"):
+                intent = percakapan
+        elif percakapan in (I.MARKETPLACE_SEARCH, I.MATERIAL_DISCOVERY, I.PURCHASE_INTENT):
+            if intent is None or intent in ("katalog", "bebas"):
+                intent = "katalog"
+                marketplace_label = percakapan
+
+        # Fallback lama untuk frasa potensi yang tidak tertangkap taksonomi baru.
+        if (intent is None and self.kg and RE_POTENSI.search(text.lower())
+                and not RE_CARA_EKSPLISIT.search(text.lower())):
+            intent = I.MATERIAL_UTILIZATION
 
         # "bukan hanya di Surabaya" bukan permintaan kota, melainkan perluasan wilayah
         negasi_kota = bool(RE_SEMUA_WILAYAH.search(text.lower()))
@@ -513,13 +629,47 @@ class DialogManager:
         elif sl.modal_skip and state.modal is None:
             state.modal_dilewati = True
 
+        if intent == I.EXPLORATION:
+            reply = self._kg_eksplorasi_reply(state, text)
+            state.last_turn = text.lower()
+            state.last_signature = f"{intent}:{_catalog_query(text)}:{self._scope(state)}"
+            return reply
+        if intent == I.MATERIAL_UTILIZATION:
+            reply = self._kg_pemanfaatan_reply(state, text)
+            state.last_turn = text.lower()
+            state.last_signature = f"{intent}:{_catalog_query(text)}:{self._scope(state)}"
+            return reply
+        if intent == I.PRODUCT_DEVELOPMENT:
+            reply = self._kg_produk_reply(state, text)
+            state.last_turn = text.lower()
+            state.last_signature = f"{intent}:{_catalog_query(text)}:{self._scope(state)}"
+            return reply
+        if intent == I.PROCESS_EXPLANATION:
+            reply = self._kg_proses_reply(state, text)
+            state.last_turn = text.lower()
+            state.last_signature = f"{intent}:{_catalog_query(text)}:{self._scope(state)}"
+            return reply
+        if intent == I.ALTERNATIVE_DISCOVERY:
+            reply = self._kg_alternatif_reply(state, text)
+            state.last_turn = text.lower()
+            state.last_signature = f"{intent}:{_catalog_query(text)}:{self._scope(state)}"
+            return reply
+        if intent == I.CIRCULAR_ECONOMY:
+            reply = self._kg_sirkular_reply(state, text)
+            state.last_turn = text.lower()
+            state.last_signature = f"{intent}:{_catalog_query(text)}:{self._scope(state)}"
+            return reply
+
         if intent in ("katalog_jumlah", "katalog", "pilih_material",
-                      "detail_material", "pesan", "hitung_material"):
+                      "detail_material", "pesan", "hitung_material", "potensi"):
             material_text = text
             if (negasi_kota and not query_tokens(text) and state.last_search_query
                     and state.last_result_kind in ("material", "stats")):
                 material_text = f"{state.last_search_query} {text}"
             reply = self._handle_material_intent(state, material_text, intent)
+            if marketplace_label and reply.intent == "katalog":
+                reply.intent = marketplace_label
+                reply.facts["intent_percakapan"] = marketplace_label
             state.last_turn = text.lower()
             state.last_signature = f"{intent}:{_catalog_query(text)}:{self._scope(state)}"
             return reply
@@ -589,6 +739,8 @@ class DialogManager:
             return self._material_detail_reply(state, text)
         if intent == "pesan":
             return self._order_reply(state, text)
+        if intent == "potensi":
+            return self._potensi_reply(state, text)
         return self._material_hitung_reply(state, text)
 
     def _rekomendasi(self, state: State, materials) -> Reply:
@@ -632,3 +784,209 @@ class DialogManager:
         text, used = R.hitung_text(resep, qty, state, materials)
         return Reply(text, used or mids, rid, intent, task="hitung",
                      facts=F.hitung(resep, qty, state, materials))
+
+    # ---------- knowledge graph reasoning ----------
+    @staticmethod
+    def _pathway_keywords(p: dict) -> list[str]:
+        return [
+            part.strip()
+            for part in str(p.get("kata_kunci") or "").split("|")
+            if part.strip()
+        ]
+
+    def _set_kg_context(self, state: State, *, jenis: str,
+                        kategori: str | None = None,
+                        produk: str | None = None,
+                        kata_kunci: list[str] | None = None,
+                        pathways: list[dict] | None = None,
+                        clear: bool = False) -> None:
+        if clear:
+            state.fokus_kategori = None
+            state.fokus_produk = None
+            state.fokus_kata_kunci = []
+        if kategori:
+            state.fokus_kategori = kategori
+        if produk:
+            state.fokus_produk = produk
+        if kata_kunci is not None:
+            state.fokus_kata_kunci = list(kata_kunci)
+        state.kg_terakhir = {
+            "jenis": jenis,
+            "kategori": state.fokus_kategori,
+            "produk": state.fokus_produk,
+            "kata_kunci": list(state.fokus_kata_kunci),
+            "jalur": pathways or [],
+        }
+        state.last_result_kind = jenis
+        state.last_material_ids = []
+        state.selected_material = None
+        state.fase = "eksplorasi" if jenis == "kg_eksplorasi" else "pendampingan"
+        state.awaiting = []
+
+    def _kg_category_for(self, text: str, state: State) -> str | None:
+        categories = categories_for_query(text)
+        if len(categories) == 1:
+            return next(iter(categories))
+        if state.fokus_kategori and (not categories or state.fokus_kategori in categories):
+            return state.fokus_kategori
+        return sorted(categories)[0] if categories else None
+
+    def _kg_pathways_for(self, text: str, state: State, limit: int = 3) -> tuple[str | None, list[dict]]:
+        category = self._kg_category_for(text, state)
+        pathways = self.kg.search_products(text, kategori=category, limit=limit)
+        if not pathways and category:
+            pathways = self.kg.search_products(text, limit=limit)
+            if pathways:
+                category = pathways[0].get("kategori")
+        if pathways:
+            return pathways[0].get("kategori") or category, pathways
+        if category:
+            pathways = self.kg.pathways_for_category(category, limit=limit)
+            if pathways:
+                return category, pathways
+        if state.fokus_kategori:
+            pathways = self.kg.pathways_for_category(state.fokus_kategori, limit=limit)
+            if pathways:
+                return state.fokus_kategori, pathways
+        pathways = self.kg.pathways_for_text(text, limit=limit)
+        if pathways:
+            return pathways[0].get("kategori"), pathways
+        return category, []
+
+    def _kg_no_data_reply(self, state: State, text: str, jenis: str, intent: str) -> Reply:
+        self._set_kg_context(state, jenis="kg_tidak_ditemukan")
+        return Reply(
+            R.kg_tidak_ditemukan_text(jenis, text),
+            intent=intent,
+            task="kg_tidak_ditemukan",
+            facts=F.kg_tidak_ditemukan(jenis, text, state),
+        )
+
+    def _kg_eksplorasi_reply(self, state: State, text: str) -> Reply:
+        ideas = self.kg.ideas(limit=4)
+        if not ideas:
+            return self._kg_no_data_reply(state, text, "ide produk", I.EXPLORATION)
+        self._set_kg_context(state, jenis="kg_eksplorasi", pathways=ideas, clear=True)
+        return Reply(
+            R.kg_eksplorasi_text(ideas),
+            intent=I.EXPLORATION,
+            task="kg_eksplorasi",
+            facts=F.kg_eksplorasi(ideas, state),
+        )
+
+    def _kg_sirkular_reply(self, state: State, text: str) -> Reply:
+        """Jelaskan ekonomi sirkular sebagai perjalanan material limbah yang terus berputar.
+
+        Memakai kategori dan contoh produk dari Knowledge Graph sebagai ilustrasi nyata,
+        bukan menawarkan katalog.
+        """
+        if not self.kg:
+            return Reply(
+                R.kg_sirkular_text([], []),
+                intent=I.CIRCULAR_ECONOMY,
+                task="kg_sirkular",
+                facts=F.kg_sirkular([], [], state),
+            )
+        categories = self.kg.categories
+        ideas = self.kg.ideas(limit=4)
+        self._set_kg_context(state, jenis="kg_sirkular", pathways=ideas, clear=True)
+        return Reply(
+            R.kg_sirkular_text(categories, ideas),
+            intent=I.CIRCULAR_ECONOMY,
+            task="kg_sirkular",
+            facts=F.kg_sirkular(categories, ideas, state),
+        )
+
+    def _kg_pemanfaatan_reply(self, state: State, text: str) -> Reply:
+        category = self._kg_category_for(text, state)
+        pathways = self.kg.pathways_for_category(category, limit=4) if category else []
+        if not pathways:
+            pathways = self.kg.pathways_for_text(text, limit=4)
+            category = pathways[0].get("kategori") if pathways else category
+        if not pathways:
+            return self._kg_no_data_reply(state, text, "pemanfaatan material", I.MATERIAL_UTILIZATION)
+        first = pathways[0]
+        self._set_kg_context(
+            state,
+            jenis="kg_pemanfaatan",
+            kategori=category,
+            produk=first.get("produk"),
+            kata_kunci=self._pathway_keywords(first),
+            pathways=pathways,
+        )
+        return Reply(
+            R.kg_pemanfaatan_text(category or "material tersebut", pathways),
+            intent=I.MATERIAL_UTILIZATION,
+            task="kg_pemanfaatan",
+            facts=F.kg_pemanfaatan(category or "", pathways, state),
+        )
+
+    def _kg_produk_reply(self, state: State, text: str) -> Reply:
+        category, pathways = self._kg_pathways_for(text, state, limit=3)
+        if not pathways:
+            return self._kg_no_data_reply(state, text, "pengembangan produk", I.PRODUCT_DEVELOPMENT)
+        first = pathways[0]
+        product = first.get("produk") or "produk tersebut"
+        self._set_kg_context(
+            state,
+            jenis="kg_produk",
+            kategori=category,
+            produk=product,
+            kata_kunci=self._pathway_keywords(first),
+            pathways=pathways,
+        )
+        return Reply(
+            R.kg_produk_text(product, pathways),
+            intent=I.PRODUCT_DEVELOPMENT,
+            task="kg_produk",
+            facts=F.kg_produk(text, pathways, state),
+        )
+
+    def _kg_proses_reply(self, state: State, text: str) -> Reply:
+        category, pathways = self._kg_pathways_for(text, state, limit=2)
+        if not pathways:
+            return self._kg_no_data_reply(state, text, "proses", I.PROCESS_EXPLANATION)
+        first = pathways[0]
+        product = first.get("produk") or "produk tersebut"
+        self._set_kg_context(
+            state,
+            jenis="kg_proses",
+            kategori=category,
+            produk=product,
+            kata_kunci=self._pathway_keywords(first),
+            pathways=pathways,
+        )
+        return Reply(
+            R.kg_proses_text(product, pathways),
+            intent=I.PROCESS_EXPLANATION,
+            task="kg_proses",
+            facts=F.kg_proses(text, pathways, state),
+        )
+
+    def _kg_alternatif_reply(self, state: State, text: str) -> Reply:
+        category = self._kg_category_for(text, state)
+        if not category:
+            products = self.kg.search_products(text, limit=1)
+            if products:
+                category = products[0].get("kategori")
+        category = category or state.fokus_kategori
+        if not category:
+            return self._kg_no_data_reply(state, text, "alternatif material", I.ALTERNATIVE_DISCOVERY)
+        alternatif = self.kg.alternative_keywords(text, kategori=category, limit=6)
+        if not alternatif:
+            return self._kg_no_data_reply(state, text, "alternatif material", I.ALTERNATIVE_DISCOVERY)
+        m = re.search(r"(?:kalau|jika)\s+(.+?)\s+tidak\s+(?:ada|tersedia)", text, re.I)
+        sumber = m.group(1).strip() if m else (state.fokus_produk or state.fokus_kategori or "material itu")
+        self._set_kg_context(
+            state,
+            jenis="kg_alternatif",
+            kategori=category,
+            kata_kunci=[a.get("istilah") for a in alternatif if a.get("istilah")],
+            pathways=[],
+        )
+        return Reply(
+            R.kg_alternatif_text(sumber, category, alternatif),
+            intent=I.ALTERNATIVE_DISCOVERY,
+            task="kg_alternatif",
+            facts=F.kg_alternatif(sumber, category, alternatif, state),
+        )

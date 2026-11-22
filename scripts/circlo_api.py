@@ -43,6 +43,7 @@ from circlo_ai.catalog import SupabaseCatalog, material_search, region_candidate
 from circlo_ai.dialog import DialogManager, State
 from circlo_ai.embedder import E5Embedder
 from circlo_ai.images import image_meta_for
+from circlo_ai.knowledge_graph import KnowledgeGraph
 from circlo_ai.recommender import Recommender
 
 MAX_TEXT_LEN = 2000
@@ -107,11 +108,14 @@ async def lifespan(app: FastAPI):
     if not resep:
         raise RuntimeError("Tabel resep_produk kosong. Jalankan step2_seed_data.sql dulu.")
 
+    kg = KnowledgeGraph.from_recipes(resep)
+
     _resources["catalog"] = catalog
+    _resources["kg"] = kg
     _refresh_catalog(force=True)
     embedder = E5Embedder()
     _resources["embedder"] = embedder
-    _resources["dm"] = DialogManager(catalog, Recommender(embedder, resep))
+    _resources["dm"] = DialogManager(catalog, Recommender(embedder, resep), kg=kg)
     yield
     _resources.clear()
     _sessions.clear()
@@ -165,7 +169,9 @@ def _cards_for(material_ids: list) -> list[dict]:
     return out
 
 
-THIN_TASKS = {"tanya_slot", "tanya_produk"}
+# Tugas yang cukup dijawab dari fakta dialog. Jangan suntik hasil pencarian katalog
+# otomatis di sini supaya AI tidak menawarkan produk saat pengguna belum memintanya.
+THIN_TASKS: set[str] = set()
 
 
 def _retrieve(dm: DialogManager, state: State, text: str, materials: list, limit: int = 4):
@@ -233,11 +239,13 @@ def _sse(event: str, data: dict) -> str:
 
 @app.get("/health")
 def health():
+    kg = _resources.get("kg")
     return {
         "status": "ok",
         "ready": "dm" in _resources,
         "llm": circlo_llm.is_configured(),
         "materials": len(_resources.get("materials", [])),
+        "kg": kg.stats() if kg else None,
     }
 
 
@@ -299,6 +307,41 @@ def material(mid: int):
     return _card(m)
 
 
+@app.get("/kg/pathways")
+def kg_pathways(kategori: str | None = None, q: str | None = None, limit: int = 5):
+    """Jalur pemanfaatan dari Knowledge Graph resep_produk.
+
+    Pilih salah satu: kategori (mis. Tekstil) atau q (teks bebas).
+    """
+    kg: KnowledgeGraph | None = _resources.get("kg")
+    if not kg:
+        raise HTTPException(status_code=503, detail="Knowledge Graph belum dimuat.")
+    limit = max(1, min(12, int(limit or 5)))
+    if kategori:
+        rows = kg.pathways_for_category(kategori, limit)
+    elif q:
+        rows = kg.pathways_for_text(q, limit)
+    else:
+        raise HTTPException(status_code=400, detail="Sebutkan kategori atau q.")
+    return {"kategori": kategori, "query": q, "pathways": rows}
+
+
+@app.get("/kg/material/{mid}")
+def kg_material(mid: int):
+    """Jalur pemanfaatan untuk satu material katalog."""
+    kg: KnowledgeGraph | None = _resources.get("kg")
+    if not kg:
+        raise HTTPException(status_code=503, detail="Knowledge Graph belum dimuat.")
+    _refresh_catalog()
+    m = _resources.get("by_id", {}).get(mid)
+    if not m:
+        catalog = _resources.get("catalog")
+        m = catalog.get_material(mid) if catalog else None
+    if not m:
+        raise HTTPException(status_code=404, detail="Material tidak ditemukan.")
+    return {"material": _card(m), "pathways": kg.pathways_for_material(m, 5)}
+
+
 @app.post("/chat")
 def chat(payload: ChatIn):
     text = (payload.text or "").strip()
@@ -338,7 +381,12 @@ def chat(payload: ChatIn):
     meta = {
         "session_id": sid,
         "intent": reply.intent,
+        "intent_percakapan": facts.get("intent_percakapan") or reply.intent,
         "task": reply.task,
+        "sumber_pengetahuan": facts.get("sumber_pengetahuan"),
+        "knowledge_graph": (
+            facts if facts.get("sumber_pengetahuan") == "knowledge_graph" else None
+        ),
         "material_ids": material_ids,
         "materials": _cards_for(material_ids),
         "resep_ids": reply.resep_ids,
@@ -376,3 +424,39 @@ def reset(payload: ResetIn):
     with _lock:
         _sessions.pop(payload.session_id, None)
     return {"status": "ok"}
+
+
+@app.get("/kg/products")
+def kg_products(q: str | None = None, kategori: str | None = None, limit: int = 5):
+    """Cari produk/proses yang relevan dari nama produk dan kata kunci resep."""
+    kg: KnowledgeGraph | None = _resources.get("kg")
+    if not kg:
+        raise HTTPException(status_code=503, detail="Knowledge Graph belum dimuat.")
+    limit = max(1, min(12, int(limit or 5)))
+    rows = kg.search_products(q or "", kategori=kategori, limit=limit)
+    if not rows and kategori:
+        rows = kg.pathways_for_category(kategori, limit)
+    return {"query": q, "kategori": kategori, "products": rows}
+
+
+@app.get("/kg/ideas")
+def kg_ideas(limit: int = 5):
+    """Contoh ide lintas kategori dari resep referensi."""
+    kg: KnowledgeGraph | None = _resources.get("kg")
+    if not kg:
+        raise HTTPException(status_code=503, detail="Knowledge Graph belum dimuat.")
+    limit = max(1, min(12, int(limit or 5)))
+    return {"ideas": kg.ideas(limit)}
+
+
+@app.get("/kg/alternatives")
+def kg_alternatives(q: str | None = None, kategori: str | None = None, limit: int = 6):
+    """Alternatif kata kunci material dalam kategori yang sama."""
+    kg: KnowledgeGraph | None = _resources.get("kg")
+    if not kg:
+        raise HTTPException(status_code=503, detail="Knowledge Graph belum dimuat.")
+    limit = max(1, min(12, int(limit or 6)))
+    rows = kg.alternative_keywords(q or "", kategori=kategori, limit=limit)
+    if not rows:
+        raise HTTPException(status_code=404, detail="Alternatif tidak ditemukan.")
+    return {"query": q, "kategori": kategori, "alternatives": rows}

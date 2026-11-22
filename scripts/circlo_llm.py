@@ -43,13 +43,43 @@ SYSTEM_PROMPT = BASE_SYSTEM_PROMPT + (
     "tidak ada di [FAKTA]. Jawab langsung pertanyaan terakhir pengguna; jangan mengulang "
     "pertanyaan pengguna dan jangan memberi daftar langkah generik. Jangan menanyakan kota atau "
     "modal yang sudah diberikan pengguna; tanyakan klarifikasi hanya bila benar-benar diperlukan. "
-    "Bila [FAKTA] memuat `hasil_pencarian` (material dari katalog CIRCLO), utamakan menyebut "
-    "material itu lengkap dengan harga, kota, dan stoknya. Bila data yang diminta tidak ada di "
-    "[FAKTA], katakan singkat bahwa datanya belum tersedia, lalu tawarkan satu langkah alternatif "
-    "yang masih didukung [FAKTA]. Format Markdown ringkas: **tebal** untuk nama produk/harga/angka "
-    "kunci, `- ` untuk poin. Panjang normal 2-5 kalimat atau maksimal 4 poin; tanpa basa-basi "
-    "pembuka, tanpa disclaimer berlebihan, dan tanpa peringatan keselamatan yang tidak ada di [FAKTA]."
+    "Bila [FAKTA] berisi `knowledge_graph`, jelaskan hubungan material-proses-produk dan alasan "
+    "kecocokannya; jangan menambahkan harga, stok, lokasi, penjual, atau ajakan membeli kecuali "
+    "[FAKTA] juga berisi data katalog dan pengguna memintanya. Bila [FAKTA] berisi `katalog` atau "
+    "`hasil_pencarian`, sebut material aktual beserta harga, kota, dan stoknya sesuai permintaan. "
+    "Bila relasi yang diminta tidak ada di [FAKTA], katakan belum tersedia; jangan mengarang. "
+    "Format Markdown ringkas: **tebal** untuk nama produk/harga/angka kunci, `- ` untuk poin. "
+    "Panjang normal 2-5 kalimat atau maksimal 4 poin; tanpa basa-basi pembuka, tanpa disclaimer "
+    "berlebihan, dan tanpa peringatan keselamatan yang tidak ada di [FAKTA]."
 )
+
+
+# Format jawaban Knowledge Graph. Hanya ditambahkan untuk tugas kg_* agar prompt dasar
+# (circlo_ai/prompting.py, dipakai juga saat training) tidak berubah.
+KG_FORMAT_PROMPT = (
+    " FORMAT KHUSUS TUGAS kg_* (menggantikan batas panjang dan larangan daftar langkah di atas): "
+    "tulis Markdown terstruktur dengan urutan berikut. "
+    "(1) Heading `### Judul` singkat. "
+    "(2) Satu kalimat jawaban inti. "
+    "(3) Untuk tiap jalur di [FAKTA] (maksimal 3): baris `**N. Nama produk**`, lalu poin: "
+    "`- Jalur:` isi persis dari `rantai`; `- Bahan kunci:` dari `kata_kunci_material`; "
+    "`- Proses:` diikuti daftar bernomor dari `langkah_terurut` (jangan menambah langkah baru); "
+    "`- Kebutuhan bahan:` dari bahan_per_unit, satuan, persen_susut; `- K3:` hanya bila ada. "
+    "(4) `**Langkah selanjutnya**` berisi 1-3 poin ajakan lanjut, tanpa menawarkan pembelian. "
+    "(5) Baris miring `*Sumber: Knowledge Graph CIRCLO (resep_produk). ...*` ringkas dari `catatan`. "
+    "Lewati bagian yang datanya tidak ada di [FAKTA] dan jangan mengarang isinya. "
+    "Untuk kg_alternatif tampilkan daftar bernomor istilah beserta jumlah resep dan contoh produk. "
+    "Untuk kg_tidak_ditemukan cukup heading, satu kalimat bahwa relasi belum ada, dan 2 saran kategori."
+)
+KG_MAX_TOKENS = 900
+
+
+def _is_kg_task(task: str) -> bool:
+    return str(task or "").startswith("kg_")
+
+
+def _system_prompt(task: str) -> str:
+    return SYSTEM_PROMPT + KG_FORMAT_PROMPT if _is_kg_task(task) else SYSTEM_PROMPT
 
 
 def _config():
@@ -95,11 +125,11 @@ def _payload(model: str, task: str, facts: dict, prev_user: list[str], user_text
     payload = {
         "model": model,
         "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": _system_prompt(task)},
             {"role": "user", "content": build_user_block(task, facts or {}, prev_user, user_text)},
         ],
         "temperature": 0.3,
-        "max_tokens": MAX_TOKENS,
+        "max_tokens": KG_MAX_TOKENS if _is_kg_task(task) else MAX_TOKENS,
     }
     if stream:
         payload["stream"] = True

@@ -65,7 +65,7 @@ export async function POST(request) {
     const body = await request.json();
 
     const idMaterial = Number(body.id_material);
-    const jumlah = Number(body.jumlah ?? 1);
+    const jumlah = Number(body.jumlah ?? body.kuantitas ?? 1);
 
     if (
       !Number.isSafeInteger(idMaterial) ||

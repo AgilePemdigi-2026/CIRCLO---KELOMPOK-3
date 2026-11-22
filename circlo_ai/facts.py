@@ -135,6 +135,8 @@ def katalog(state, found: dict, cards: list[dict], alternatif: bool = False) -> 
     stats = found.get("_katalog_stats") or {}
     return {
         "jenis": "katalog_material",
+        "sumber_pengetahuan": "katalog",
+        "intent_percakapan": "marketplace_search",
         "wilayah": {
             "kota_user": state.kota,
             "provinsi_user": state.provinsi,
@@ -155,6 +157,11 @@ def katalog(state, found: dict, cards: list[dict], alternatif: bool = False) -> 
         "sebaran_kategori": stats.get("kategori"),
         "material": [_material_fact(m) for m in cards],
         "memakai_alternatif": alternatif,
+        "konteks_kg": {
+            "kategori": getattr(state, "fokus_kategori", None),
+            "produk": getattr(state, "fokus_produk", None),
+            "jalur": (getattr(state, "kg_terakhir", {}) or {}).get("jalur", []),
+        },
         "catatan": "Hanya material aktif dan stok > 0 yang dihitung.",
     }
 
@@ -189,3 +196,171 @@ def hitung_material(m: dict, budget: float | None, affordable: int | None,
         "total_biaya": total,
         "dibatasi_stok": bool(qty is not None and affordable is not None and qty < affordable),
     }
+
+
+def potensi(kategori: str, pathways: list[dict], cards: list[dict], state) -> dict:
+    return {
+        "jenis": "potensi_pemanfaatan",
+        "kategori": kategori,
+        "wilayah": {
+            "kota": state.kota,
+            "provinsi": state.provinsi,
+            "scope": "all" if state.scope_all else ("kota" if state.kota else "provinsi" if state.provinsi else "all"),
+        },
+        "jalur": [
+            {
+                "produk": p.get("produk"),
+                "langkah": p.get("langkah"),
+                "k3": p.get("k3"),
+                "bahan_per_unit": p.get("bahan_per_unit"),
+                "satuan": p.get("satuan"),
+                "persen_susut": p.get("persen_susut"),
+                "estimasi_modal": p.get("estimasi_modal"),
+            }
+            for p in pathways
+        ],
+        "material_tersedia": [_material_fact(m) for m in cards],
+        "catatan": (
+            "Jalur berasal dari data resep referensi. Bukan jaminan hasil produksi "
+            "atau klaim dampak lingkungan."
+        ),
+    }
+
+def _kg_pathway(p: dict) -> dict:
+    from .responder import _kg_chain, _kg_steps  # impor lokal: hindari impor melingkar
+
+    return {
+        "produk": p.get("produk"),
+        "kategori": p.get("kategori"),
+        "rantai": _kg_chain(p),
+        "kata_kunci_material": p.get("kata_kunci"),
+        "langkah": p.get("langkah"),
+        "langkah_terurut": _kg_steps(p.get("langkah")),
+        "k3": p.get("k3"),
+        "bahan_per_unit": p.get("bahan_per_unit"),
+        "satuan": p.get("satuan"),
+        "persen_susut": p.get("persen_susut"),
+        "estimasi_modal": p.get("estimasi_modal"),
+        "alasan": p.get("alasan"),
+        "sumber": p.get("sumber") or "resep_produk",
+    }
+
+
+def _kg_base(state, jenis: str, **extra) -> dict:
+    data = {
+        "jenis": jenis,
+        "sumber_pengetahuan": "knowledge_graph",
+        "basis_data": "resep_produk",
+        "wilayah": {
+            "kota": state.kota,
+            "provinsi": state.provinsi,
+            "scope": "all" if state.scope_all else (
+                "kota" if state.kota else "provinsi" if state.provinsi else "all"
+            ),
+        },
+        "butuh_katalog": False,
+        "catatan": (
+            "Jalur berasal dari data resep referensi. Bukan data stok, bukan jaminan "
+            "hasil produksi, dan bukan klaim dampak lingkungan."
+        ),
+    }
+    data.update(extra)
+    return data
+
+
+def kg_eksplorasi(ide: list[dict], state) -> dict:
+    return _kg_base(
+        state,
+        "eksplorasi_ide",
+        ide=[_kg_pathway(p) for p in ide],
+        inferensi=(
+            "Daftar ide diambil dari resep yang tersedia dan dipilih lintas kategori; "
+            "bukan rekomendasi stok aktual."
+        ),
+    )
+
+
+def kg_sirkular(kategori: list[str], ide: list[dict], state) -> dict:
+    return _kg_base(
+        state,
+        "ekonomi_sirkular",
+        siklus=["kumpulkan", "pilah dan bersihkan", "olah menjadi produk", "pakai atau jual", "sisa kembali ke siklus"],
+        kategori_tersedia=list(kategori or []),
+        contoh_jalur=[_kg_pathway(p) for p in (ide or [])[:4]],
+        inferensi=(
+            "Penjelasan konsep ekonomi sirkular; contoh jalur diambil dari resep "
+            "referensi, bukan stok aktual."
+        ),
+    )
+
+
+def kg_pemanfaatan(kategori: str, pathways: list[dict], state) -> dict:
+    return _kg_base(
+        state,
+        "pemanfaatan_material",
+        kategori=kategori,
+        jalur=[_kg_pathway(p) for p in pathways],
+        inferensi="Jalur ditelusuri dari kategori material ke proses dan produk di resep.",
+    )
+
+
+def kg_produk(permintaan: str, pathways: list[dict], state) -> dict:
+    return _kg_base(
+        state,
+        "pengembangan_produk",
+        permintaan=permintaan,
+        jalur=[_kg_pathway(p) for p in pathways],
+        kandidat_bahan=[
+            {
+                "kategori": p.get("kategori"),
+                "kata_kunci": [
+                    part.strip()
+                    for part in str(p.get("kata_kunci") or "").split("|")
+                    if part.strip()
+                ],
+            }
+            for p in pathways
+        ],
+        inferensi=(
+            "Produk dicocokkan dari nama produk dan kata kunci material di resep. "
+            "Kata kunci bukan stok aktual."
+        ),
+    )
+
+
+def kg_proses(permintaan: str, pathways: list[dict], state) -> dict:
+    return _kg_base(
+        state,
+        "penjelasan_proses",
+        permintaan=permintaan,
+        jalur=[_kg_pathway(p) for p in pathways],
+        inferensi=(
+            "Langkah dan K3 diambil dari resep referensi; hasil aktual bisa berbeda "
+            "tergantung bahan dan alat."
+        ),
+    )
+
+
+def kg_alternatif(sumber: str, kategori: str, alternatif: list[dict], state) -> dict:
+    return _kg_base(
+        state,
+        "alternatif_material",
+        sumber_material=sumber,
+        kategori=kategori,
+        alternatif=alternatif,
+        inferensi=(
+            "Alternatif diambil dari kata kunci material pada resep kategori yang sama, "
+            "bukan dari stok atau relasi yang dikarang."
+        ),
+    )
+
+
+def kg_tidak_ditemukan(jenis: str, query: str, state) -> dict:
+    return _kg_base(
+        state,
+        "kg_tidak_ditemukan",
+        jenis_yang_dicari=jenis,
+        query=query,
+        jalur=[],
+        inferensi="Knowledge Graph tidak memiliki relasi yang cocok untuk permintaan ini.",
+    )

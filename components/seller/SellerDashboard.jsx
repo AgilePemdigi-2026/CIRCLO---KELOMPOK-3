@@ -89,6 +89,7 @@ export default function SellerDashboard() {
       ).length,
       completed: completedOrders.length,
       impact_kg: Math.round(impactKg * 100) / 100,
+      material_dialihkan_kg: Math.round(impactKg * 100) / 100,
       completed_units: Math.round(completedUnits * 100) / 100,
     };
   }, [orders]);
@@ -190,17 +191,18 @@ export default function SellerDashboard() {
               <div className="relative flex items-start justify-between gap-4">
                 <div>
                   <p className="text-[12.5px] font-semibold uppercase tracking-[0.1em] text-circlo-muted">
-                    Total Dampak
+                    Material Dialihkan
                   </p>
                   <div className="mt-4 flex items-end gap-2">
                     <span className="font-display text-[52px] font-semibold leading-none text-circlo-green">
-                      {angka.format(Number(data.impact_kg || 0))}
+                      {angka.format(Number(data.material_dialihkan_kg ?? data.impact_kg ?? 0))}
                     </span>
                     <span className="pb-1 text-[18px] font-semibold text-circlo-muted">kg</span>
                   </div>
                   <p className="mt-3 max-w-[470px] text-[14px] leading-relaxed text-circlo-muted">
-                    Akumulasi material bersatuan kg dari pesanan berstatus Selesai. Setiap
-                    transaksi yang selesai membantu material tetap berputar di komunitas.
+                    Volume material bersatuan kg dari pesanan berstatus Selesai. Angka ini
+                    menunjukkan jumlah material yang tercatat dialihkan, bukan klaim dampak
+                    lingkungan.
                   </p>
                 </div>
                 <span className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-circlo-soft text-circlo-green">
@@ -212,7 +214,7 @@ export default function SellerDashboard() {
                 <span className="inline-flex items-center gap-2 rounded-full bg-circlo-soft px-3.5 py-1.5 text-[12.5px] font-semibold text-circlo-green">
                   <Sparkles className="h-4 w-4" />
                   {data.rank?.rank
-                    ? `Peringkat #${data.rank.rank} dari ${data.rank.total_sellers} penjual`
+                    ? `Peringkat #${data.rank.rank} dari ${data.rank.total_sellers} penjual (material kg)`
                     : data.completed > 0
                       ? `${data.completed} pesanan selesai`
                       : 'Belum ada pesanan selesai'}

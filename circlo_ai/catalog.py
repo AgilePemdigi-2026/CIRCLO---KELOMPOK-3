@@ -29,7 +29,7 @@ CATEGORY_SYNONYMS = {
 
 SEARCH_STOPWORDS = {
     "aku", "saya", "mau", "ingin", "pengen", "cari", "carikan", "butuh", "butuhkan",
-    "material", "materials", "produk", "produknya", "item", "katalog", "katalognya",
+    "material", "materials", "bahan", "bahannya", "produk", "produknya", "item", "katalog", "katalognya",
     "daftar", "tampilkan", "lihat", "kasih", "beri", "minta", "semua", "seluruh",
     "yang", "dan", "atau", "untuk", "buat", "membuat", "dengan", "di", "dari",
     "kota", "kabupaten", "kab", "provinsi", "wilayah", "daerah", "sekitar", "hanya",
@@ -39,7 +39,8 @@ SEARCH_STOPWORDS = {
     "tadi", "kok", "cuma", "sedikit", "banyak", "lebih", "lain", "lainnya",
     "cuman", "hanya", "sebenarnya", "sih", "deh", "nih", "tuh", "itu", "ini",
     "maksudku", "maksud", "mauku", "maunya", "tampilkan", "lihat", "kasih",
-    "beri", "carikan", "cari", "mencari", "pesan", "beli", "pilih", "nomor",
+    "beri", "carikan", "cari", "mencari", "pesan", "beli", "membeli", "pilih", "nomor",
+    "sekarang", "kini", "saat", "tolong", "bisa", "dapat", "mohon", "usaha", "bisnis",
     "murah", "termurah", "terjangkau", "mahal", "berkualitas", "kualitas",
     "bagus", "baik", "terbaik", "bawah", "dibawah", "maks", "maksimal",
     "sampai", "sampai dengan", "harga", "rp", "juta", "ribu", "rb",

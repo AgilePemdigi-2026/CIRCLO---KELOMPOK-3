@@ -3,19 +3,22 @@ import matplotlib.pyplot as plt
 
 # ==========================================
 # BURNDOWN CHART CIRCLO
-# Sprint 1 selesai, minggu ke-11
+# Sprint 3 - Minggu Pertama
 # ==========================================
 
 # Sumbu X
-sprints = ["Start", "Sprint 1", "Sprint 2", "Sprint 3"]
+sprints = [
+    "Start",
+    "Sprint 1",
+    "Sprint 2",
+    "Sprint 3\n(Minggu 1)"
+]
 
-# Ideal burndown berdasarkan grafik sebelumnya
+# Ideal burndown
 ideal_burndown = [47, 27, 9, 0]
 
 # Actual burndown
-# 47 = total effort awal
-# Ubah nilai Sprint 1 berdasarkan sisa effort aktual
-actual_burndown = [47, 36.9, None, None]
+actual_burndown = [47, 36.9, 9, 9]
 
 # ==========================================
 # VISUALISASI
@@ -30,24 +33,16 @@ plt.plot(
     color="#91A889",
     linewidth=2.5,
     marker="o",
-    markersize=5,
+    markersize=6,
     label="Ideal Burndown"
 )
 
-# Tampilkan actual hanya sampai Sprint 1 selesai
-actual_x = []
-actual_y = []
-
-for i, value in enumerate(actual_burndown):
-    if value is not None:
-        actual_x.append(sprints[i])
-        actual_y.append(value)
-
+# Garis aktual
 plt.plot(
-    actual_x,
-    actual_y,
+    sprints,
+    actual_burndown,
     color="#FF5CA8",
-    linewidth=2,
+    linewidth=2.5,
     linestyle="--",
     marker="o",
     markersize=7,
@@ -60,14 +55,14 @@ for x, y in zip(sprints, ideal_burndown):
         str(y),
         (x, y),
         textcoords="offset points",
-        xytext=(8, -13),
+        xytext=(0, -15),
         ha="center",
         color="#5B7652",
         fontsize=9
     )
 
 # Label nilai aktual
-for x, y in zip(actual_x, actual_y):
+for x, y in zip(sprints, actual_burndown):
     plt.annotate(
         str(y),
         (x, y),
@@ -81,14 +76,14 @@ for x, y in zip(actual_x, actual_y):
 # Judul dan sumbu
 plt.title("Burndown Chart CIRCLO", fontsize=15)
 plt.xlabel("Total Sprint")
-plt.ylabel("Total Effort (story point)")
+plt.ylabel("Total Effort (Story Point)")
 
 plt.ylim(-2, 52)
 plt.grid(True, linestyle="--", alpha=0.5)
 plt.legend()
 plt.tight_layout()
 
-# Simpan gambar untuk laporan
+# Simpan gambar
 plt.savefig(
     "burndown_chart_circlo.png",
     dpi=300,

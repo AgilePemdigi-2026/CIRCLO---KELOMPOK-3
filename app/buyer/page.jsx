@@ -321,7 +321,7 @@ export default async function BuyerPage() {
               <KartuMaterial key={m.id_material} m={m} />
             ))}
             <Link
-              href="/marketplace"
+              href="/katalog"
               className="flex min-h-[200px] flex-col items-center justify-center rounded-2xl bg-[#8bc34a] p-6 text-center shadow-sm transition hover:bg-[#7db840] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#3f6a0b]"
             >
               <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/30 text-[#2c4a06]">

@@ -326,6 +326,7 @@ function buildSummary(orders) {
     0
   );
 
+<<<<<<< Updated upstream
   const completedUnits =
     completedOrders.reduce(
       (sum, order) =>
@@ -340,6 +341,9 @@ function buildSummary(orders) {
         ),
       0
     );
+=======
+  const materialDialihkanKg = Math.round(impactKg * 100) / 100;
+>>>>>>> Stashed changes
 
   return {
     pending: orders.filter(
@@ -359,6 +363,7 @@ function buildSummary(orders) {
     ).length,
 
     completed: completedOrders.length,
+<<<<<<< Updated upstream
 
     impact_kg:
       Math.round(impactKg * 100) / 100,
@@ -366,6 +371,13 @@ function buildSummary(orders) {
     completed_units:
       Math.round(completedUnits * 100) /
       100,
+=======
+    // Nama lama dipertahankan agar klien lama tetap berjalan. Nilainya adalah
+    // volume material (kg) dari pesanan selesai, bukan klaim dampak lingkungan.
+    impact_kg: materialDialihkanKg,
+    material_dialihkan_kg: materialDialihkanKg,
+    completed_units: Math.round(completedUnits * 100) / 100,
+>>>>>>> Stashed changes
   };
 }
 

@@ -12,9 +12,28 @@ function buatPrompt(s) {
     belum_terserap: s.ringkasan.belumTerserap,
     pesanan_berhasil: s.kpi.pesananBerhasil,
     kg_terserap: s.kpi.terserapKg,
+    pasokan_kg: s.kpi.pasokanKg,
     pengelola_aktif: s.kpi.pengelolaAktif,
     per_kategori: s.kategori.map((r) => ({ kategori: r.kategori, listing: r.listing, terserap: r.terserap })),
-    titik_panas: s.hotspot.slice(0, 5).map((r) => ({ kota: r.kota, listing: r.listing, pesanan: r.pesanan })),
+    neraca_pasokan_permintaan: (s.neraca || []).slice(0, 12).map((r) => ({
+      kategori: r.kategori,
+      satuan: r.satuan,
+      pasokan: r.pasokan,
+      permintaan: r.permintaan,
+    })),
+    peluang: (s.peluang || []).map((r) => ({
+      kategori: r.kategori,
+      satuan: r.satuan,
+      pasokan: r.pasokan,
+      permintaan: r.permintaan,
+    })),
+    titik_panas: s.hotspot.slice(0, 5).map((r) => ({
+      kota: r.kota,
+      listing: r.listing,
+      pesanan: r.pesanan,
+      pasokan_kg: r.pasokanKg,
+      permintaan_kg: r.permintaanKg,
+    })),
   };
   return (
     'Kamu analis kebijakan ekonomi sirkular untuk pemerintah. ' +

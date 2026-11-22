@@ -261,8 +261,8 @@ def katalog_text(state, found: dict, cards: list[dict]) -> str:
     if found["total"] > len(cards):
         lines.append(f"Masih ada {found['total'] - len(cards)} material lain. "
                      'Ketik "tampilkan semua" atau sebut kategori/kota untuk mempersempit.')
-    lines.append('Pilih nomor material untuk melihat detail, atau ketik "pesan <nomor> <jumlah>" '
-                 "kalau sudah cocok.")
+    lines.append('Kamu bisa pilih nomor untuk melihat detail. Kalau sudah menemukan yang cocok '
+                 'dan ingin membeli, ketik "pesan <nomor> <jumlah>".')
     return "\n".join(lines)
 
 
@@ -419,3 +419,260 @@ def material_hitung_text(m: dict, budget: float, affordable: int,
     lines.append("")
     lines.append(f'Ketik "pesan {qty} {satuan}" kalau mau lanjut, atau tekan tombol Pesan pada kartu.')
     return "\n".join(lines)
+
+
+# ---------- knowledge graph / potensi pemanfaatan ----------
+def potensi_text(kategori: str, pathways: list[dict], cards: list[dict]) -> str:
+    lines = [
+        f"Potensi pemanfaatan material kategori {kategori} berdasarkan data resep CIRCLO:"
+    ]
+    for i, p in enumerate(pathways, 1):
+        lines.append(f"{i}. {p.get('produk') or 'Produk tanpa nama'}")
+        if p.get("bahan_per_unit") is not None and p.get("satuan"):
+            lines.append(
+                f"   Kebutuhan bahan: {fmt_num(float(p['bahan_per_unit']))} {p['satuan']} per unit."
+            )
+        if p.get("langkah"):
+            lines.append(f"   Langkah: {p['langkah']}")
+        if p.get("k3"):
+            lines.append(f"   K3: {p['k3']}")
+    if cards:
+        lines.append("")
+        lines.append("Material aktif yang bisa dipakai:")
+        for m in cards:
+            lines.append(f"- {_mat_line(m)}")
+    else:
+        lines.append("")
+        lines.append("Belum ada listing aktif untuk kategori ini di wilayahmu; coba perluas wilayah.")
+    lines.append("")
+    lines.append(
+        "Catatan: jalur ini berasal dari data resep referensi, bukan jaminan hasil produksi "
+        "atau klaim dampak lingkungan."
+    )
+    return "\n".join(lines)
+
+
+def potensi_kosong_text(text: str) -> str:
+    return (
+        "Belum ada data resep pemanfaatan yang cocok untuk permintaan itu. "
+        "Coba sebutkan kategori material (misalnya tekstil, plastik, kayu, kertas) "
+        "atau pilih satu material dari katalog."
+    )
+
+# ---------- knowledge graph reasoning (respons terstruktur Markdown) ----------
+# Semua teks di bagian ini hanya memakai data resep_produk yang dikirim dialog.
+# Format dirender ReactMarkdown di UI: heading (###), **tebal**, daftar "- " dan "1. ".
+import re as _re
+
+_STEP_SPLIT = _re.compile(
+    r"(?:,\s+(?=[A-Za-z\u00C0-\u00FF])|;\s*|\.\s+(?=[A-Z])|\s+lalu\s+|\s+kemudian\s+)"
+)
+
+KG_SOURCE = "Knowledge Graph CIRCLO (tabel resep_produk)"
+
+
+def _kg_keywords(p: dict) -> str:
+    raw = str(p.get("kata_kunci") or "").strip()
+    return raw.replace("|", ", ") if raw else "belum dicatat"
+
+
+def _kg_steps(langkah) -> list[str]:
+    """Pecah langkah_singkat jadi daftar langkah; koma desimal (1,5) tidak dipecah."""
+    raw = str(langkah or "").strip()
+    if not raw:
+        return []
+    parts = [s.strip(" .") for s in _STEP_SPLIT.split(raw)]
+    return [s[0].upper() + s[1:] for s in parts if s]
+
+
+def _kg_chain(p: dict) -> str:
+    """Jalur KG: Kategori -> kata aksi proses -> Produk."""
+    verbs: list[str] = []
+    for step in _kg_steps(p.get("langkah")):
+        word = step.split()[0].capitalize()
+        if word not in verbs:
+            verbs.append(word)
+        if len(verbs) == 4:
+            break
+    nodes = [str(p.get("kategori") or "Material")] + verbs
+    nodes.append(str(p.get("produk") or "Produk"))
+    return " → ".join(nodes)
+
+
+def _kg_join(lines: list[str]) -> str:
+    """Gabung baris; rapikan baris kosong berlebih agar Markdown bersih."""
+    return _re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip() + "\n"
+
+
+def _kg_header(title: str) -> list[str]:
+    return [f"### {title}", ""]
+
+
+def _kg_footer(note: str) -> list[str]:
+    return ["", f"*Sumber: {KG_SOURCE}. {note}*"]
+
+
+def _kg_next(options: list[str]) -> list[str]:
+    out = ["", "**Langkah selanjutnya**"]
+    out.extend(f"- {o}" for o in options)
+    return out
+
+
+def _kg_followups(pathways: list[dict], proses=True, alternatif=True, katalog=True,
+                  pemanfaatan=False) -> list[str]:
+    """Kalimat contoh yang bisa diketik pengguna; semuanya memuat kata domain
+    (limbah/bahan/material) agar diarahkan intent classifier ke KG atau katalog."""
+    p = pathways[0] if pathways else {}
+    kat = str(p.get("kategori") or "").strip().lower()
+    produk = str(p.get("produk") or "").strip().lower()
+    terms = [t.strip() for t in str(p.get("kata_kunci") or "").split("|") if t.strip()]
+    out: list[str] = []
+    if pemanfaatan and kat:
+        out.append(f'Jalur lengkap satu kategori: *"potensi pemanfaatan limbah {kat}"*')
+    if proses and kat and produk:
+        out.append(f'Detail proses: *"cara mengolah limbah {kat} jadi {produk}"*')
+    if alternatif and terms:
+        out.append(f'Bahan pengganti: *"alternatif bahan pengganti {terms[0]}"*')
+    if katalog and kat:
+        out.append(f'Cek listing tersedia: *"cari material {kat}"*')
+    return out
+
+
+def _kg_card(i: int, p: dict, detail: str = "full") -> list[str]:
+    """Satu kartu jalur. detail: 'ringkas' (jalur+bahan) atau 'full' (+proses, angka, K3)."""
+    lines = [f"**{i}. {p.get('produk') or 'Produk tanpa nama'}**"]
+    lines.append(f"- Jalur: {_kg_chain(p)}")
+    lines.append(f"- Bahan kunci: {_kg_keywords(p)}")
+    if p.get("alasan") and detail == "full":
+        lines.append(f"- Alasan cocok: {p['alasan']}")
+    if detail == "full":
+        steps = _kg_steps(p.get("langkah"))
+        if steps:
+            lines.append("- Proses:")
+            lines.extend(f"  {n}. {s}" for n, s in enumerate(steps, 1))
+        numbers = []
+        if p.get("bahan_per_unit") is not None and p.get("satuan"):
+            numbers.append(f"{fmt_num(float(p['bahan_per_unit']))} {p['satuan']} per unit")
+        if p.get("persen_susut") is not None:
+            numbers.append(f"susut {_persen(float(p['persen_susut']))}")
+        if numbers:
+            lines.append("- Kebutuhan bahan: " + ", ".join(numbers))
+        if p.get("estimasi_modal"):
+            lines.append(f"- Estimasi modal awal: {fmt_rp(float(p['estimasi_modal']))} (kasar, dari resep referensi)")
+        if p.get("k3"):
+            lines.append(f"- K3: {p['k3']}")
+    lines.append("")
+    return lines
+
+
+def kg_eksplorasi_text(ide: list[dict]) -> str:
+    lines = _kg_header("Ide pemanfaatan limbah (ekonomi sirkular)")
+    lines += [
+        "**Siklus:** Limbah → Dipilah → Diolah → Produk → Sisa produksi kembali ke siklus",
+        "",
+        "Resep referensi CIRCLO memuat arah pemanfaatan berikut:",
+        "",
+    ]
+    for i, p in enumerate(ide, 1):
+        lines += _kg_card(i, p, "ringkas")
+    lines += _kg_next(_kg_followups(ide, pemanfaatan=True, alternatif=False, katalog=False)
+                      or ["Sebut kategori material (mis. tekstil, plastik, kayu) untuk melihat jalurnya."])
+    lines += _kg_footer("Ini referensi proses, belum mengecek stok atau harga.")
+    return _kg_join(lines)
+
+
+def kg_sirkular_text(kategori: list[str], ide: list[dict]) -> str:
+    lines = _kg_header("Ekonomi sirkular: limbah sebagai bahan baku")
+    lines += [
+        "Ekonomi sirkular memandang limbah sebagai bahan yang terus berputar, "
+        "bukan sampah yang berakhir di TPA.",
+        "",
+        "**Perjalanan material**",
+        "1. **Kumpulkan** limbah atau sisa material dari rumah, toko, atau industri.",
+        "2. **Pilah & bersihkan** agar layak dipakai kembali.",
+        "3. **Olah** menjadi produk bernilai (lihat resep referensi CIRCLO).",
+        "4. **Pakai atau jual** produknya; sisa produksi kembali ke langkah 1.",
+    ]
+    if kategori:
+        lines += ["", "**Kategori yang bisa masuk siklus ini:** " + ", ".join(kategori[:8]) + "."]
+    if ide:
+        lines += ["", "**Contoh jalur dari resep referensi**", ""]
+        for i, p in enumerate(ide[:4], 1):
+            lines.append(f"{i}. {_kg_chain(p)}")
+    lines += _kg_next(_kg_followups(ide, pemanfaatan=True, alternatif=False, katalog=False)
+                      or ["Sebut kategori material untuk melihat jalur pemanfaatannya."])
+    lines += _kg_footer("Intinya: nilai material dipertahankan selama mungkin.")
+    return _kg_join(lines)
+
+
+def kg_pemanfaatan_text(kategori: str, pathways: list[dict]) -> str:
+    lines = _kg_header(f"Jalur pemanfaatan limbah {kategori}")
+    lines += [
+        f"**Siklus:** {kategori} → Dikumpulkan → Dipilah → Diolah → Produk → Sisa kembali ke siklus",
+        "",
+        f"Resep referensi mencatat **{len(pathways)} jalur** untuk kategori ini:",
+        "",
+    ]
+    for i, p in enumerate(pathways, 1):
+        lines += _kg_card(i, p, "full")
+    lines += _kg_next(_kg_followups(pathways))
+    lines += _kg_footer("Stok belum ditampilkan karena belum diminta.")
+    return _kg_join(lines)
+
+
+def kg_produk_text(permintaan: str, pathways: list[dict]) -> str:
+    lines = _kg_header(f"Produk yang cocok untuk: {permintaan}")
+    if pathways:
+        best = pathways[0]
+        lines += [
+            f"**Paling relevan:** {best.get('produk') or 'Produk tanpa nama'} "
+            f"(kategori {best.get('kategori') or 'belum dicatat'})",
+            "",
+        ]
+    for i, p in enumerate(pathways, 1):
+        lines += _kg_card(i, p, "full")
+    lines += _kg_next(_kg_followups(pathways))
+    lines += _kg_footer("Bahan di atas adalah kata kunci resep, bukan stok aktual.")
+    return _kg_join(lines)
+
+
+def kg_proses_text(permintaan: str, pathways: list[dict]) -> str:
+    lines = _kg_header(f"Proses pengolahan: {permintaan}")
+    lines += ["**Siklus:** Limbah → Dipilah → Diolah → Produk → Sisa kembali", ""]
+    for i, p in enumerate(pathways, 1):
+        lines += _kg_card(i, p, "full")
+    lines += _kg_next(_kg_followups(pathways, proses=False))
+    lines += _kg_footer("Ini langkah resep referensi, bukan jaminan hasil produksi.")
+    return _kg_join(lines)
+
+
+def kg_alternatif_text(sumber: str, kategori: str, alternatif: list[dict]) -> str:
+    lines = _kg_header(f"Alternatif pengganti {sumber}")
+    lines += [
+        f"Resep kategori **{kategori}** menyebut kata kunci material berikut:",
+        "",
+    ]
+    for i, item in enumerate(alternatif, 1):
+        used = item.get("jumlah_resep") or 1
+        lines.append(
+            f"{i}. **{item.get('istilah')}** — dipakai di {used} resep "
+            f"(contoh produk: {item.get('contoh_produk') or 'belum dicatat'})"
+        )
+    lines += _kg_next([
+        f'Cek listing tersedia: *"cari material {str(kategori).lower()}"*',
+    ])
+    lines += _kg_footer("Alternatif berasal dari kata kunci resep, bukan jaminan stok.")
+    return _kg_join(lines)
+
+
+def kg_tidak_ditemukan_text(jenis: str, query: str) -> str:
+    lines = _kg_header("Belum ada di Knowledge Graph")
+    lines += [
+        f"Relasi **{jenis}** untuk \"{query}\" belum tercatat di data resep, "
+        "dan aku tidak mengarang relasi yang tidak ada.",
+        "",
+        "**Coba salah satu cara ini**",
+        "- Sebut kategori material: tekstil, plastik, kayu, kertas, logam, kaca, karet, organik.",
+        "- Atau sebut produk yang lebih spesifik, mis. *tote bag*, *paving*, *pot tanaman*.",
+    ]
+    return _kg_join(lines)
